@@ -3,175 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Life VIP Tracker</title>
+    <title>Life VIP Tracker Pro</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; overflow: hidden; }
-        #map { height: 100vh; width: 100vw; z-index: 1; background: #e9ecef; }
-
-        /* Estilo das Bolhas (Marcadores) */
-        .marker-vip { position: relative; width: 55px; height: 55px; }
-        .bubble { 
-            width: 50px; height: 50px; border-radius: 50%; border: 3px solid #fff;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: flex;
-            align-items: center; justify-content: center; font-weight: 800;
-            color: white; font-size: 18px; transition: all 0.3s ease;
-        }
-        .name-tag {
-            position: absolute; bottom: -28px; left: 50%; transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8); color: white; padding: 3px 12px;
-            border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap;
-        }
-
-        /* Sistema de Notificações Pop-up */
-        #notification-toast {
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 10000; background: #333; color: white; padding: 12px 25px;
-            border-radius: 30px; font-size: 14px; font-weight: 600;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            display: none; animation: slideDown 0.5s ease;
-        }
-
-        @keyframes slideDown { from { top: -60px; } to { top: 20px; } }
-
-        /* Tela de Entrada */
-        #auth-screen { 
-            position: fixed; inset: 0; background: #fff; z-index: 9999; 
-            display: none; flex-direction: column; align-items: center; justify-content: center; 
-        }
-        .box { width: 85%; max-width: 380px; text-align: center; }
-        input { width: 100%; padding: 18px; margin: 25px 0; border-radius: 15px; border: 2px solid #eee; font-size: 16px; box-sizing: border-box; }
-        .btn-main { width: 100%; padding: 18px; border-radius: 15px; border: none; background: #1a1a1a; color: white; font-weight: 700; cursor: pointer; font-size: 16px; }
-
-        .controls { position: fixed; top: 80px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
-        .btn-ui { width: 50px; height: 50px; border-radius: 15px; border: none; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); font-size: 20px; cursor: pointer; }
-    </style>
-</head>
+    <link rel="stylesheet" href="style.css"> </head>
 <body>
 
-    <div id="notification-toast"></div>
-
-    <div id="auth-screen">
-        <div class="box">
-            <h1 style="letter-spacing:-1px">Life VIP</h1>
-            <p style="color:#666">Rastreamento familiar em tempo real</p>
-            <input type="text" id="userName" placeholder="Qual seu nome?">
-            <button class="btn-main" onclick="cadastrar()">ATIVAR MEU PERFIL</button>
-        </div>
+    <div id="notif-request" onclick="ativarNotificacoes()">
+        🔔 Toque aqui para ativar alertas de sistema e novos membros
     </div>
 
-    <div class="controls">
-        <button class="btn-ui" onclick="focusAll()">👥</button>
-        <button class="btn-ui" onclick="location.reload()">🔄</button>
+    <div class="ui-panel">
+        <button class="btn-action" onclick="focarFamilia()" title="Focar Família">👥</button>
+        <button class="btn-action" onclick="location.reload()" title="Recarregar">🔄</button>
     </div>
-    
+
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
-
-    <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyBPwwAWS2aiEqeFJX1ARgRmHzFEj5RCpiw",
-            databaseURL: "https://rastreador-familia-6fe52-default-rtdb.firebaseio.com/",
-            projectId: "rastreador-familia-6fe52",
-        };
-
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-        let map, myId, markers = {}, activeRoute = null;
-        const colors = ['#6200ee', '#03dac6', '#ff0266', '#ffde03', '#00c853'];
-
-        window.onload = () => {
-            myId = localStorage.getItem('life_vip_id');
-            if (myId) startTracker();
-            else document.getElementById('auth-screen').style.display = 'flex';
-        };
-
-        function cadastrar() {
-            const name = document.getElementById('userName').value.trim();
-            if (name) {
-                localStorage.setItem('life_vip_id', name);
-                location.reload();
-            }
-        }
-
-        function showToast(msg) {
-            const toast = document.getElementById('notification-toast');
-            toast.innerText = msg;
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 4000);
-        }
-
-        function startTracker() {
-            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0,0], 15);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
-
-            // Escuta novos membros e atualizações
-            db.ref('familia').on('child_added', snap => {
-                if (snap.key !== myId) showToast(`🚀 ${snap.key} entrou no grupo!`);
-            });
-
-            syncFamily();
-            watchMe();
-            cleanup(48);
-        }
-
-        function syncFamily() {
-            db.ref('familia').on('value', snap => {
-                const users = snap.val();
-                for (let id in users) {
-                    const data = users[id];
-                    const color = colors[Math.abs(id.length) % colors.length];
-
-                    if (markers[id]) {
-                        markers[id].setLatLng([data.lat, data.lng]);
-                    } else {
-                        markers[id] = L.marker([data.lat, data.lng], {
-                            icon: L.divIcon({
-                                className: 'vip-icon',
-                                html: `<div class="marker-vip">
-                                        <div class="bubble" style="background:${color}">${id.substring(0,2).toUpperCase()}</div>
-                                        <div class="name-tag">${id}</div>
-                                       </div>`,
-                                iconSize: [55, 55], iconAnchor: [27, 55]
-                            })
-                        }).addTo(map).on('click', () => drawRoute(id, data.trajetos, color));
-                    }
-                }
-            });
-        }
-
-        function drawRoute(id, logs, color) {
-            if (activeRoute) map.removeLayer(activeRoute);
-            if (!logs) return;
-            const points = Object.values(logs).map(l => [l.lat, l.lng]);
-            activeRoute = L.polyline(points, {color: color, weight: 5, opacity: 0.4, dashArray: '10, 10'}).addTo(map);
-            showToast(`Exibindo rastro de ${id}`);
-        }
-
-        function watchMe() {
-            navigator.geolocation.watchPosition(p => {
-                const { latitude, longitude } = p.coords;
-                const r = db.ref('familia/' + myId);
-                r.update({ lat: latitude, lng: longitude });
-                r.child('trajetos').push({ lat: latitude, lng: longitude, t: Date.now() });
-                if(Object.keys(markers).length <= 1) map.panTo([latitude, longitude]);
-            }, null, { enableHighAccuracy: true });
-        }
-
-        function cleanup(hrs) {
-            const cut = Date.now() - (hrs * 60 * 60 * 1000);
-            db.ref('familia').once('value', s => {
-                s.forEach(u => u.child('trajetos').forEach(p => { if(p.val().t < cut) p.ref.remove(); }));
-            });
-        }
-
-        function focusAll() {
-            const group = new L.featureGroup(Object.values(markers));
-            if (group.getLayers().length > 0) map.fitBounds(group.getBounds().pad(0.3));
-        }
-    </script>
-</body>
+    <script src="app.js"></script> </body>
 </html>
