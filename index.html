@@ -2,108 +2,146 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <link rel="manifest" href="manifest.json">
-    <title>Família 360 Lite</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Família VIP Tracker</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; background: #f0f2f5; overflow: hidden; }
-        #map { height: 75vh; width: 100%; }
-        .panel { 
-            height: 25vh; padding: 15px; background: white; 
-            border-radius: 20px 20px 0 0; position: relative; 
-            z-index: 1000; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); 
-            text-align: center;
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background: #f0f2f5; }
+        #map { height: 100vh; width: 100vw; z-index: 1; }
+        
+        /* Bolha de Localização com Foto */
+        .user-marker {
+            width: 60px; height: 60px;
+            border-radius: 50%; border: 4px solid white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            background-size: cover; background-position: center;
+            position: relative; animation: pulse 2s infinite;
         }
-        input { width: 85%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
-        button { width: 85%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; }
-        #status { margin-top: 10px; font-size: 14px; color: #666; }
+        .user-marker::after {
+            content: ''; position: absolute; bottom: -12px; left: 50%;
+            transform: translateX(-50%);
+            border-left: 10px solid transparent; border-right: 10px solid transparent;
+            border-top: 12px solid white;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Tela de Nome (Persistente) */
+        #auth-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .card { width: 85%; max-width: 400px; text-align: center; }
+        input { padding: 18px; border-radius: 15px; border: 2px solid #eee; margin-bottom: 15px; width: 100%; font-size: 16px; box-sizing: border-box; }
+        button { padding: 18px; background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; width: 100%; font-size: 16px; cursor: pointer; }
+        
+        /* Badge de Status Inferior */
+        .status-badge {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: white; padding: 15px 30px; border-radius: 50px;
+            z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            font-weight: 600; color: #1a1a1a; min-width: 200px; text-align: center;
+        }
     </style>
 </head>
 <body>
 
-<div id="map"></div>
-
-<div class="panel">
-    <div id="setup">
-        <input type="text" id="userName" placeholder="Seu Nome (ex: Mãe, Irmã)">
-        <button onclick="iniciar()">ATIVAR MONITORAMENTO 24H</button>
+    <div id="auth-screen" style="display: none;">
+        <div class="card">
+            <img src="https://cdn-icons-png.flaticon.com/512/854/854878.png" width="80" style="margin-bottom: 20px;">
+            <h2 style="margin-bottom: 10px;">Quem é você?</h2>
+            <p style="color: #666; margin-bottom: 20px;">Isso será pedido apenas uma vez.</p>
+            <input type="text" id="userName" placeholder="Ex: Mãe, Irmã, Wanssu...">
+            <button onclick="startApp()">CONFIGURAR AGORA</button>
+        </div>
     </div>
-    <p id="status">Aguardando ativação...</p>
-</div>
 
-<script>
-    // CONFIGURAÇÃO CONFIGURADA COM SEUS DADOS DA FOTO
-    var firebaseConfig = {
-        apiKey: "AIzaSyBPwwAWS2aiEqeFJX1ARgRmHzFEj5RCpiw",
-        authDomain: "rastreador-familia-6fe52.firebaseapp.com",
-        databaseURL: "https://rastreador-familia-6fe52-default-rtdb.firebaseio.com",
-        projectId: "rastreador-familia-6fe52",
-        storageBucket: "rastreador-familia-6fe52.firebasestorage.app",
-        messagingSenderId: "347150916124",
-        appId: "1:347150916124:web:a0c75430ba1f5f2985ddd9"
-    };
+    <div id="map"></div>
+    <div id="status" class="status-badge">Detectando posição...</div>
 
-    firebase.initializeApp(firebaseConfig);
-    var db = firebase.database();
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
-    // Iniciar Mapa
-    var map = L.map('map').setView([-23.55, -46.63], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    var markers = {};
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBPwwAWS2aiEqeFJX1ARgRmHzFEj5RCpiw",
+            authDomain: "rastreador-familia-6fe52.firebaseapp.com",
+            databaseURL: "https://rastreador-familia-6fe52-default-rtdb.firebaseio.com/",
+            projectId: "rastreador-familia-6fe52",
+            storageBucket: "rastreador-familia-6fe52.firebasestorage.app",
+            messagingSenderId: "347150916124",
+            appId: "1:347150916124:web:a0c75430ba1f5f2985ddd9"
+        };
 
-    // Ativar Service Worker para rodar em segundo plano
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
-    }
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        let map, userMarker, userName;
 
-    function iniciar() {
-        var nome = document.getElementById('userName').value;
-        if (!nome) return alert("Por favor, digite seu nome.");
-        
-        document.getElementById('setup').style.display = 'none';
-        document.getElementById('status').innerHTML = "<b>Monitoramento Ativo</b><br>Enviando localização para a família...";
-
-        // Rastreamento Contínuo
-        navigator.geolocation.watchPosition(function(pos) {
-            var lat = pos.coords.latitude;
-            var lng = pos.coords.longitude;
-            var velocidade = pos.coords.speed || 0;
-            var statusMovimento = (velocidade > 0.5) ? "Em Movimento" : "Parado";
-
-            // Envia para o Firebase na pasta 'familia'
-            db.ref('familia/' + nome).set({
-                lat: lat,
-                lng: lng,
-                status: statusMovimento,
-                hora: new Date().toLocaleTimeString(),
-                timestamp: Date.now()
-            });
-
-            map.setView([lat, lng], 15);
-        }, function(err) {
-            console.error("Erro GPS:", err);
-        }, { enableHighAccuracy: true, maximumAge: 0 });
-    }
-
-    // Atualiza o mapa com a posição de todos os membros
-    db.ref('familia').on('value', function(snapshot) {
-        var usuarios = snapshot.val();
-        for (var id in usuarios) {
-            var u = usuarios[id];
-            if (markers[id]) {
-                markers[id].setLatLng([u.lat, u.lng]).setPopupContent(id + ": " + u.status);
+        window.onload = () => {
+            userName = localStorage.getItem('family_gps_user');
+            if (userName) {
+                initApp();
             } else {
-                markers[id] = L.marker([u.lat, u.lng]).addTo(map).bindPopup(id + ": " + u.status).openPopup();
+                document.getElementById('auth-screen').style.display = 'flex';
+            }
+        };
+
+        function startApp() {
+            const val = document.getElementById('userName').value.trim();
+            if (val) {
+                localStorage.setItem('family_gps_user', val);
+                userName = val;
+                document.getElementById('auth-screen').style.display = 'none';
+                initApp();
             }
         }
-    });
-</script>
 
+        function initApp() {
+            // Mapa moderno e limpo (CartoDB)
+            map = L.map('map', { zoomControl: false }).setView([0,0], 2);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+            startTracking();
+        }
+
+        function startTracking() {
+            navigator.geolocation.watchPosition(pos => {
+                const { latitude, longitude, speed } = pos.coords;
+                const kmh = Math.round((speed || 0) * 3.6);
+                
+                // Inteligência de Movimento
+                let msg = kmh > 12 ? "🚗 No Carro ("+kmh+" km/h)" : (kmh > 2 ? "🚶 Andando" : "📍 Parado");
+                document.getElementById('status').innerText = msg;
+
+                db.ref('familia/' + userName).set({
+                    lat: latitude, lng: longitude,
+                    status: msg, speed: kmh,
+                    lastSeen: new Date().toLocaleTimeString()
+                });
+
+                updateMap(latitude, longitude);
+            }, null, { enableHighAccuracy: true });
+        }
+
+        function updateMap(lat, lng) {
+            const photoUrl = 'https://ui-avatars.com/api/?name='+userName+'&background=random&size=128';
+            if (!userMarker) {
+                const icon = L.divIcon({
+                    className: 'custom-icon',
+                    html: `<div class='user-marker' style="background-image: url('${photoUrl}');"></div>`,
+                    iconSize: [60, 60], iconAnchor: [30, 60]
+                });
+                userMarker = L.marker([lat, lng], { icon: icon }).addTo(map);
+                map.setView([lat, lng], 16);
+            } else {
+                userMarker.setLatLng([lat, lng]);
+            }
+            map.panTo([lat, lng]);
+        }
+    </script>
 </body>
 </html>
