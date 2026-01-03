@@ -23,7 +23,7 @@
     <div id="auth-screen" style="display: none;">
         <div class="card">
             <h2>Configuração de Perfil</h2>
-            <p style="font-size: 14px; color: #d9534f; font-weight: bold;">IMPORTANTE: Na próxima tela, escolha "PERMITIR O TEMPO TODO".</p>
+            <p style="font-size: 14px; color: #d9534f; font-weight: bold;">IMPORTANTE: Ative "Permitir o tempo todo" na próxima etapa.</p>
             <input type="text" id="userName" placeholder="Nome (Ex: Mãe)">
             <label style="font-size: 14px; color: #666;">Escolha sua Foto:</label>
             <input type="file" id="userPhoto" accept="image/*" class="file-btn">
@@ -33,15 +33,15 @@
 
     <div id="permission-overlay">
         <h2 style="color:#ffc107">Ação Necessária!</h2>
-        <p>Para o rastreador funcionar 24h em segundo plano:</p>
-        <div style="text-align:left; margin:20px 0; background:rgba(255,255,255,0.1); padding:15px; border-radius:10px;">
-            1. Clique no botão abaixo.<br>
+        <p>O Android exige que você autorize manualmente para o rastreio não parar:</p>
+        <div style="text-align:left; margin:20px 0; background:rgba(255,255,255,0.1); padding:15px; border-radius:10px; font-size: 14px;">
+            1. Clique no botão azul.<br>
             2. Vá em <b>"Permissões"</b>.<br>
             3. Selecione <b>"Localização"</b>.<br>
             4. Marque <b>"Permitir o tempo todo"</b>.
         </div>
-        <button onclick="openSettings()" style="padding:20px; background:#007bff; color:white; border:none; border-radius:10px; font-weight:bold; width:100%;">IR PARA CONFIGURAÇÕES</button>
-        <p onclick="closeOverlay()" style="margin-top:20px; font-size:12px; text-decoration:underline; opacity:0.7;">Já fiz isso / Pular</p>
+        <button onclick="openSettings()" style="padding:20px; background:#007bff; color:white; border:none; border-radius:10px; font-weight:bold; width:100%;">TENTAR ABRIR CONFIGURAÇÕES</button>
+        <p onclick="closeOverlay()" style="margin-top:25px; font-size:13px; text-decoration:underline; opacity:0.8; cursor:pointer;">Já ativei ou fazer depois</p>
     </div>
 
     <div id="map"></div>
@@ -52,7 +52,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
     <script>
-        // SEU FIREBASE JÁ ESTÁ AQUI ABAIXO:
         const firebaseConfig = {
             apiKey: "AIzaSyBPwwAWS2aiEqeFJX1ARgRmHzFEj5RCpiw",
             authDomain: "rastreador-familia-6fe52.firebaseapp.com",
@@ -100,8 +99,9 @@
         }
 
         function openSettings() {
+            // Tenta abrir as configurações sem forçar a Play Store
             window.location.href = "intent:#Intent;action=android.settings.LOCATION_SOURCE_SETTINGS;end";
-            setTimeout(() => { closeOverlay(); }, 3000);
+            setTimeout(() => { closeOverlay(); }, 4000);
         }
 
         function closeOverlay() {
