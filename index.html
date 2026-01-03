@@ -10,79 +10,37 @@
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
         .user-marker { 
-            width: 65px; height: 65px; border-radius: 50%; border: 4px solid white; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3); background-size: cover; 
+            width: 50px; height: 50px; border-radius: 50%; border: 3px solid white; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); background-size: cover; 
             background-position: center; position: relative; 
         }
-        .user-marker::after { 
-            content: ''; position: absolute; bottom: -12px; left: 50%; 
-            transform: translateX(-50%); border-left: 10px solid transparent; 
-            border-right: 10px solid transparent; border-top: 12px solid white; 
+        .user-label {
+            background: rgba(0,0,0,0.7); color: white; padding: 2px 8px;
+            border-radius: 10px; font-size: 11px; white-space: nowrap;
+            position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%);
         }
 
-        /* Tela de Cadastro */
         #auth-screen { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: white; z-index: 9999; display: flex; 
+            background: white; z-index: 9999; display: none; 
             flex-direction: column; align-items: center; justify-content: center; 
         }
         .card { width: 85%; max-width: 400px; text-align: center; }
-        input, .file-btn { padding: 15px; border-radius: 12px; border: 2px solid #eee; margin-bottom: 10px; width: 100%; font-size: 15px; box-sizing: border-box; display: block;}
+        input { padding: 15px; border-radius: 12px; border: 2px solid #eee; margin-bottom: 10px; width: 100%; box-sizing: border-box; }
         button { padding: 18px; background: #28a745; color: white; border: none; border-radius: 12px; font-weight: bold; width: 100%; cursor: pointer; }
-        
-        /* Badge de Status */
-        .status-badge { 
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); 
-            background: white; padding: 15px 25px; border-radius: 50px; 
-            z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.15); 
-            font-weight: 600; text-align: center; min-width: 220px; 
-        }
-
-        /* Overlay de Instrução Bonito */
-        #permission-overlay { 
-            position:fixed; top:0; left:0; width:100%; height:100%; 
-            background: linear-gradient(135deg, #1a1a1a 0%, #333 100%); 
-            z-index:10000; color:white; padding:40px; text-align:center; 
-            display:none; flex-direction:column; align-items:center; justify-content:center; 
-        }
-        .step-box { 
-            background: rgba(255,255,255,0.1); padding: 20px; 
-            border-radius: 15px; text-align: left; margin: 20px 0; 
-            border-left: 5px solid #ffc107; line-height: 1.6;
-        }
     </style>
 </head>
 <body>
 
-    <div id="auth-screen" style="display: none;">
+    <div id="auth-screen">
         <div class="card">
-            <h2 style="color: #333;">Bem-vindo à Família</h2>
-            <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Configure seu perfil para começar o rastreio.</p>
+            <h2>Entrar na Família</h2>
             <input type="text" id="userName" placeholder="Seu Nome">
-            <label style="font-size: 13px; color: #888; display: block; margin-bottom: 5px;">Sua melhor foto:</label>
-            <input type="file" id="userPhoto" accept="image/*" class="file-btn">
-            <button onclick="startApp()">SALVAR PERFIL</button>
+            <button onclick="startApp()">ENTRAR</button>
         </div>
-    </div>
-
-    <div id="permission-overlay">
-        <div style="font-size: 50px; margin-bottom: 10px;">📍</div>
-        <h2 style="color:#ffc107; margin: 0;">Quase Pronto!</h2>
-        <p style="opacity: 0.9;">Para o app rastrear mesmo com a tela desligada, siga este passo rápido no seu celular:</p>
-        
-        <div class="step-box">
-            1. Saia do app e vá em <b>Configurações</b>.<br>
-            2. Toque em <b>Aplicativos</b> e procure por este app.<br>
-            3. Vá em <b>Permissões</b> > <b>Localização</b>.<br>
-            4. Escolha <b>"Permitir o tempo todo"</b>.
-        </div>
-
-        <button onclick="closeOverlay()" style="background: #ffc107; color: #000; width: 100%; max-width: 300px;">ENTENDI, ABRIR MAPA</button>
-        <p style="font-size: 12px; margin-top: 15px; opacity: 0.6;">Isso garante que sua família te veja sempre em tempo real.</p>
     </div>
 
     <div id="map"></div>
-    <div id="status" class="status-badge">Buscando sinal...</div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
@@ -101,98 +59,96 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        let map, userMarker, userName, userPhoto;
-        let myPlaces = JSON.parse(localStorage.getItem('my_places') || '[]');
+        let map, userName;
+        let markers = {}; // Guarda os marcadores de cada pessoa
+        let pointMarkers = []; // Guarda os pontos marcados (bolhas)
 
         window.onload = () => {
             userName = localStorage.getItem('family_user');
-            userPhoto = localStorage.getItem('family_photo');
             if (userName) initApp();
             else document.getElementById('auth-screen').style.display = 'flex';
         };
 
         function startApp() {
             const name = document.getElementById('userName').value.trim();
-            const photoFile = document.getElementById('userPhoto').files[0];
-            if (!name) return alert("Por favor, digite seu nome.");
-
+            if (!name) return alert("Digite seu nome");
             localStorage.setItem('family_user', name);
             userName = name;
-
-            if (photoFile) {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    localStorage.setItem('family_photo', reader.result);
-                    userPhoto = reader.result;
-                    showInstruction();
-                };
-                reader.readAsDataURL(photoFile);
-            } else {
-                showInstruction();
-            }
-        }
-
-        function showInstruction() {
             document.getElementById('auth-screen').style.display = 'none';
-            document.getElementById('permission-overlay').style.display = 'flex';
-        }
-
-        function closeOverlay() {
-            document.getElementById('permission-overlay').style.display = 'none';
             initApp();
         }
 
         function initApp() {
-            if (map) return;
             map = L.map('map', { zoomControl: false }).setView([0,0], 2);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
             
+            // ADICIONAR PONTO (BOLHA) PARA TODOS
             map.on('contextmenu', (e) => {
-                const placeName = prompt("Como chamar este lugar? (Ex: Casa)");
+                const placeName = prompt("Nome deste ponto para a família:");
                 if (placeName) {
-                    myPlaces.push({ name: placeName, lat: e.latlng.lat, lng: e.latlng.lng });
-                    localStorage.setItem('my_places', JSON.stringify(myPlaces));
-                    alert("Local salvo!");
+                    db.ref('pontos_compartilhados').push({
+                        name: placeName,
+                        lat: e.latlng.lat,
+                        lng: e.latlng.lng,
+                        criadoPor: userName
+                    });
                 }
             });
+
+            startSync();
             startTracking();
+        }
+
+        function startSync() {
+            // Sincroniza localização de todos
+            db.ref('familia').on('value', snapshot => {
+                const data = snapshot.val();
+                for (let id in data) {
+                    const { lat, lng, lastUpdate } = data[id];
+                    if (markers[id]) {
+                        markers[id].setLatLng([lat, lng]);
+                    } else {
+                        const icon = L.divIcon({
+                            className: 'custom-div-icon',
+                            html: `<div class="user-marker" style="background-image: url('https://ui-avatars.com/api/?name=${id}&background=random')"><div class="user-label">${id}</div></div>`,
+                            iconSize: [50, 50], iconAnchor: [25, 50]
+                        });
+                        markers[id] = L.marker([lat, lng], { icon }).addTo(map);
+                    }
+                }
+            });
+
+            // Sincroniza pontos marcados (bolhas) para todos
+            db.ref('pontos_compartilhados').on('value', snapshot => {
+                // Limpa pontos antigos antes de redesenhar
+                pointMarkers.forEach(m => map.removeLayer(m));
+                pointMarkers = [];
+
+                const data = snapshot.val();
+                for (let id in data) {
+                    const p = data[id];
+                    const circle = L.circle([p.lat, p.lng], {
+                        color: 'blue',
+                        fillColor: '#30f',
+                        fillOpacity: 0.2,
+                        radius: 100
+                    }).addTo(map).bindPopup(`<b>${p.name}</b><br>Marcado por: ${p.criadoPor}`);
+                    pointMarkers.push(circle);
+                }
+            });
         }
 
         function startTracking() {
             navigator.geolocation.watchPosition(pos => {
-                const { latitude, longitude, speed } = pos.coords;
-                const kmh = Math.round((speed || 0) * 3.6);
-                let currentStatus = kmh > 12 ? "🚗 Em movimento" : (kmh > 2 ? "🚶 Caminhando" : "📍 Parado");
-                
-                myPlaces.forEach(place => {
-                    const dist = map.distance([latitude, longitude], [place.lat, place.lng]);
-                    if (dist < 80) currentStatus = "🏠 Em: " + place.name;
-                });
-
-                document.getElementById('status').innerText = currentStatus;
+                const { latitude, longitude } = pos.coords;
                 db.ref('familia/' + userName).set({
-                    lat: latitude, lng: longitude,
-                    status: currentStatus,
-                    lastUpdate: new Date().toLocaleTimeString()
+                    lat: latitude,
+                    lng: longitude,
+                    lastUpdate: new Date().getTime()
                 });
-                updateMap(latitude, longitude);
-            }, null, { enableHighAccuracy: true });
-        }
-
-        function updateMap(lat, lng) {
-            const img = userPhoto || 'https://ui-avatars.com/api/?name='+userName+'&background=random';
-            if (!userMarker) {
-                const icon = L.divIcon({ 
-                    className: 'custom-icon', 
-                    html: `<div class='user-marker' style="background-image: url('${img}');"></div>`, 
-                    iconSize: [65, 65], iconAnchor: [32, 65] 
-                });
-                userMarker = L.marker([lat, lng], { icon: icon }).addTo(map);
-                map.setView([lat, lng], 17);
-            } else {
-                userMarker.setLatLng([lat, lng]);
-            }
-            map.panTo([lat, lng]);
+                if (markers[userName]) map.panTo([latitude, longitude]);
+                else map.setView([latitude, longitude], 15);
+            }, e => console.error(e), { enableHighAccuracy: true });
         }
     </script>
 </body>
