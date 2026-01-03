@@ -9,9 +9,9 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let map, meuNome, marcadores = {}, rastrosAtivos = {};
+let seguindoUsuario = null; // Variável para saber quem o mapa está seguindo
 const coresVip = ['#6c5ce7', '#00b894', '#ff7675', '#0984e3', '#f1c40f'];
 
-// Função de Login
 function fazerLogin() {
     const nome = document.getElementById('nameInput').value.trim();
     if (nome) {
@@ -23,11 +23,14 @@ function fazerLogin() {
 }
 
 function iniciarApp() {
-    // Configura o mapa e usa o estilo Voyager (agradável)
     map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0,0], 2);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
 
-    // FORÇAR CARREGAMENTO AUTOMÁTICO
+    // Se o usuário arrastar o mapa manualmente, para de seguir automaticamente
+    map.on('dragstart', () => {
+        seguindoUsuario = null;
+    });
+
     setTimeout(() => { map.invalidateSize(); }, 500);
 
     conectarFirebase();
@@ -55,6 +58,11 @@ function conectarFirebase() {
             if (marcadores[id]) {
                 marcadores[id].setLatLng([u.lat, u.lng]);
                 document.getElementById(`km-${id}`).innerText = `${km} km`;
+                
+                // SEGUIR MOVIMENTO: Se este usuário for o escolhido para seguir, move a câmera
+                if (seguindoUsuario === id) {
+                    map.panTo([u.lat, u.lng]);
+                }
             } else {
                 marcadores[id] = L.marker([u.lat, u.lng], {
                     icon: L.divIcon({
@@ -63,24 +71,31 @@ function conectarFirebase() {
                                <div class="etiqueta-info"><b>${id}</b> • <span id="km-${id}">${km} km</span></div>`,
                         iconSize: [45, 45], iconAnchor: [22, 45]
                     })
-                }).addTo(map).on('click', () => verHistorico(id, u.trajetos, cor, [u.lat, u.lng]));
+                }).addTo(map).on('click', () => ativarSeguirEHistorico(id, u.trajetos, cor, [u.lat, u.lng]));
             }
         }
     });
 }
 
-function verHistorico(nome, trajetos, cor, pos) {
-    // Puxa a localização dele no mapa
-    map.flyTo(pos, 16);
+function ativarSeguirEHistorico(id, trajetos, cor, pos) {
+    // Define que agora o mapa deve seguir este usuário
+    seguindoUsuario = id;
+    
+    // Amplia o mapa (zoom) para acompanhar o movimento de perto
+    map.flyTo(pos, 17, { animate: true, duration: 1.5 });
 
-    // Se já tiver rastro no mapa, remove para não poluir
-    if (rastrosAtivos[nome]) {
-        map.removeLayer(rastrosAtivos[nome]);
-        delete rastrosAtivos[nome];
+    // Gerencia o rastro (Histórico)
+    if (rastrosAtivos[id]) {
+        map.removeLayer(rastrosAtivos[id]);
+        delete rastrosAtivos[id];
     } else if (trajetos) {
-        // Puxa o histórico e desenha a linha
         const pontos = Object.values(trajetos).map(p => [p.lat, p.lng]);
-        rastrosAtivos[nome] = L.polyline(pontos, {color: cor, weight: 5, opacity: 0.5, dashArray: '10, 10'}).addTo(map);
+        rastrosAtivos[id] = L.polyline(pontos, {
+            color: cor, 
+            weight: 5, 
+            opacity: 0.5, 
+            dashArray: '10, 10'
+        }).addTo(map);
     }
 }
 
@@ -88,19 +103,26 @@ function iniciarGPS() {
     navigator.geolocation.watchPosition(pos => {
         const { latitude, longitude } = pos.coords;
         const ref = db.ref('familia/' + meuNome);
+        
         ref.update({ lat: latitude, lng: longitude });
         ref.child('trajetos').push({ lat: latitude, lng: longitude, t: Date.now() });
         
-        if (map.getZoom() < 10) map.setView([latitude, longitude], 15);
-    }, null, { enableHighAccuracy: true });
+        // Se for a primeira vez ou se estiver seguindo a si mesmo, centraliza
+        if (!seguindoUsuario || seguindoUsuario === meuNome) {
+            if (map.getZoom() < 10) {
+                map.setView([latitude, longitude], 17);
+                seguindoUsuario = meuNome;
+            }
+        }
+    }, null, { enableHighAccuracy: true, maximumAge: 0 });
 }
 
 function focarGeral() {
+    seguindoUsuario = null; // Para de seguir alguém específico para ver todos
     const grupo = new L.featureGroup(Object.values(marcadores));
     if (grupo.getLayers().length > 0) map.fitBounds(grupo.getBounds().pad(0.3));
 }
 
-// Verifica login ao abrir
 window.onload = () => {
     const salvo = localStorage.getItem('life_vip_nome');
     if (salvo) {
