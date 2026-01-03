@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="manifest" href="manifest.json">
+    <title>Família 360 Lite</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background: #f0f2f5; overflow: hidden; }
+        #map { height: 75vh; width: 100%; }
+        .panel { 
+            height: 25vh; padding: 15px; background: white; 
+            border-radius: 20px 20px 0 0; position: relative; 
+            z-index: 1000; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); 
+            text-align: center;
+        }
+        input { width: 85%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+        button { width: 85%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; }
+        #status { margin-top: 10px; font-size: 14px; color: #666; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="panel">
+    <div id="setup">
+        <input type="text" id="userName" placeholder="Seu Nome (ex: Mãe, Irmã)">
+        <button onclick="iniciar()">ATIVAR MONITORAMENTO 24H</button>
+    </div>
+    <p id="status">Aguardando ativação...</p>
+</div>
+
+<script>
+    // CONFIGURAÇÃO CONFIGURADA COM SEUS DADOS DA FOTO
+    var firebaseConfig = {
+        apiKey: "AIzaSyBPwwAWS2aiEqeFJX1ARgRmHzFEj5RCpiw",
+        authDomain: "rastreador-familia-6fe52.firebaseapp.com",
+        databaseURL: "https://rastreador-familia-6fe52-default-rtdb.firebaseio.com",
+        projectId: "rastreador-familia-6fe52",
+        storageBucket: "rastreador-familia-6fe52.firebasestorage.app",
+        messagingSenderId: "347150916124",
+        appId: "1:347150916124:web:a0c75430ba1f5f2985ddd9"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    var db = firebase.database();
+
+    // Iniciar Mapa
+    var map = L.map('map').setView([-23.55, -46.63], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    var markers = {};
+
+    // Ativar Service Worker para rodar em segundo plano
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
+    }
+
+    function iniciar() {
+        var nome = document.getElementById('userName').value;
+        if (!nome) return alert("Por favor, digite seu nome.");
+        
+        document.getElementById('setup').style.display = 'none';
+        document.getElementById('status').innerHTML = "<b>Monitoramento Ativo</b><br>Enviando localização para a família...";
+
+        // Rastreamento Contínuo
+        navigator.geolocation.watchPosition(function(pos) {
+            var lat = pos.coords.latitude;
+            var lng = pos.coords.longitude;
+            var velocidade = pos.coords.speed || 0;
+            var statusMovimento = (velocidade > 0.5) ? "Em Movimento" : "Parado";
+
+            // Envia para o Firebase na pasta 'familia'
+            db.ref('familia/' + nome).set({
+                lat: lat,
+                lng: lng,
+                status: statusMovimento,
+                hora: new Date().toLocaleTimeString(),
+                timestamp: Date.now()
+            });
+
+            map.setView([lat, lng], 15);
+        }, function(err) {
+            console.error("Erro GPS:", err);
+        }, { enableHighAccuracy: true, maximumAge: 0 });
+    }
+
+    // Atualiza o mapa com a posição de todos os membros
+    db.ref('familia').on('value', function(snapshot) {
+        var usuarios = snapshot.val();
+        for (var id in usuarios) {
+            var u = usuarios[id];
+            if (markers[id]) {
+                markers[id].setLatLng([u.lat, u.lng]).setPopupContent(id + ": " + u.status);
+            } else {
+                markers[id] = L.marker([u.lat, u.lng]).addTo(map).bindPopup(id + ": " + u.status).openPopup();
+            }
+        }
+    });
+</script>
+
+</body>
+</html>
