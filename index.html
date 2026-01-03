@@ -8,36 +8,14 @@
     <style>
         body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background: #f0f2f5; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
-        
-        .user-marker {
-            width: 65px; height: 65px;
-            border-radius: 50%; border: 4px solid white;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            background-size: cover; background-position: center;
-            position: relative;
-        }
-        .user-marker::after {
-            content: ''; position: absolute; bottom: -12px; left: 50%;
-            transform: translateX(-50%);
-            border-left: 10px solid transparent; border-right: 10px solid transparent;
-            border-top: 12px solid white;
-        }
-
-        #auth-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: white; z-index: 9999;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-        }
+        .user-marker { width: 65px; height: 65px; border-radius: 50%; border: 4px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); background-size: cover; background-position: center; position: relative; }
+        .user-marker::after { content: ''; position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%); border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 12px solid white; }
+        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .card { width: 85%; max-width: 400px; text-align: center; }
         input, .file-btn { padding: 15px; border-radius: 12px; border: 2px solid #eee; margin-bottom: 10px; width: 100%; font-size: 15px; box-sizing: border-box; display: block;}
         button { padding: 18px; background: #28a745; color: white; border: none; border-radius: 12px; font-weight: bold; width: 100%; cursor: pointer; }
-        
-        .status-badge {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: white; padding: 15px 25px; border-radius: 50px;
-            z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-            font-weight: 600; text-align: center; min-width: 220px;
-        }
+        .status-badge { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: white; padding: 15px 25px; border-radius: 50px; z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.15); font-weight: 600; text-align: center; min-width: 220px; }
+        #permission-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:10000; color:white; padding:30px; text-align:center; display:none; flex-direction:column; align-items:center; justify-content:center; }
     </style>
 </head>
 <body>
@@ -45,11 +23,25 @@
     <div id="auth-screen" style="display: none;">
         <div class="card">
             <h2>Configuração de Perfil</h2>
+            <p style="font-size: 14px; color: #d9534f; font-weight: bold;">IMPORTANTE: Na próxima tela, escolha "PERMITIR O TEMPO TODO".</p>
             <input type="text" id="userName" placeholder="Nome (Ex: Mãe)">
             <label style="font-size: 14px; color: #666;">Escolha sua Foto:</label>
             <input type="file" id="userPhoto" accept="image/*" class="file-btn">
-            <button onclick="startApp()">SALVAR E ENTRAR</button>
+            <button onclick="startApp()">SALVAR E ATIVAR</button>
         </div>
+    </div>
+
+    <div id="permission-overlay">
+        <h2 style="color:#ffc107">Ação Necessária!</h2>
+        <p>Para o rastreador funcionar 24h em segundo plano:</p>
+        <div style="text-align:left; margin:20px 0; background:rgba(255,255,255,0.1); padding:15px; border-radius:10px;">
+            1. Clique no botão abaixo.<br>
+            2. Vá em <b>"Permissões"</b>.<br>
+            3. Selecione <b>"Localização"</b>.<br>
+            4. Marque <b>"Permitir o tempo todo"</b>.
+        </div>
+        <button onclick="openSettings()" style="padding:20px; background:#007bff; color:white; border:none; border-radius:10px; font-weight:bold; width:100%;">IR PARA CONFIGURAÇÕES</button>
+        <p onclick="closeOverlay()" style="margin-top:20px; font-size:12px; text-decoration:underline; opacity:0.7;">Já fiz isso / Pular</p>
     </div>
 
     <div id="map"></div>
@@ -60,6 +52,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
     <script>
+        // SEU FIREBASE JÁ ESTÁ AQUI ABAIXO:
         const firebaseConfig = {
             apiKey: "AIzaSyBPwwAWS2aiEqeFJX1ARgRmHzFEj5RCpiw",
             authDomain: "rastreador-familia-6fe52.firebaseapp.com",
@@ -86,39 +79,47 @@
             const name = document.getElementById('userName').value.trim();
             const photoFile = document.getElementById('userPhoto').files[0];
             if (!name) return alert("Digite um nome!");
-
             localStorage.setItem('family_user', name);
             userName = name;
-
             if (photoFile) {
                 const reader = new FileReader();
                 reader.onloadend = () => {
                     localStorage.setItem('family_photo', reader.result);
                     userPhoto = reader.result;
-                    document.getElementById('auth-screen').style.display = 'none';
-                    initApp();
+                    showPermissionInstruction();
                 };
                 reader.readAsDataURL(photoFile);
             } else {
-                document.getElementById('auth-screen').style.display = 'none';
-                initApp();
+                showPermissionInstruction();
             }
+        }
+
+        function showPermissionInstruction() {
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('permission-overlay').style.display = 'flex';
+        }
+
+        function openSettings() {
+            window.location.href = "intent:#Intent;action=android.settings.LOCATION_SOURCE_SETTINGS;end";
+            setTimeout(() => { closeOverlay(); }, 3000);
+        }
+
+        function closeOverlay() {
+            document.getElementById('permission-overlay').style.display = 'none';
+            initApp();
         }
 
         function initApp() {
             map = L.map('map', { zoomControl: false }).setView([0,0], 2);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
-
-            // FUNÇÃO PARA SALVAR LUGAR AO CLICAR
             map.on('contextmenu', (e) => {
-                const placeName = prompt("Como deseja chamar este lugar? (Ex: Casa, Trabalho)");
+                const placeName = prompt("Nome deste lugar? (Ex: Casa, Trabalho)");
                 if (placeName) {
                     myPlaces.push({ name: placeName, lat: e.latlng.lat, lng: e.latlng.lng });
                     localStorage.setItem('my_places', JSON.stringify(myPlaces));
-                    alert("Lugar '" + placeName + "' salvo com sucesso!");
+                    alert("Lugar salvo!");
                 }
             });
-
             startTracking();
         }
 
@@ -126,37 +127,27 @@
             navigator.geolocation.watchPosition(pos => {
                 const { latitude, longitude, speed } = pos.coords;
                 const kmh = Math.round((speed || 0) * 3.6);
-                
                 let currentStatus = kmh > 12 ? "🚗 No Carro ("+kmh+" km/h)" : (kmh > 2 ? "🚶 Andando" : "📍 Parado");
-                
-                // Verifica se está em algum lugar salvo
                 myPlaces.forEach(place => {
                     const dist = map.distance([latitude, longitude], [place.lat, place.lng]);
                     if (dist < 80) currentStatus = "📍 Em: " + place.name;
                 });
-
                 document.getElementById('status').innerText = currentStatus;
-
                 db.ref('familia/' + userName).set({
                     lat: latitude, lng: longitude,
                     status: currentStatus,
                     lastUpdate: new Date().toLocaleTimeString()
                 });
-
                 updateMap(latitude, longitude);
-            }, null, { enableHighAccuracy: true });
+            }, null, { enableHighAccuracy: true, maximumAge: 0 });
         }
 
         function updateMap(lat, lng) {
             const img = userPhoto || 'https://ui-avatars.com/api/?name='+userName+'&background=random';
             if (!userMarker) {
-                const icon = L.divIcon({
-                    className: 'custom-icon',
-                    html: `<div class='user-marker' style="background-image: url('${img}');"></div>`,
-                    iconSize: [65, 65], iconAnchor: [32, 65]
-                });
+                const icon = L.divIcon({ className: 'custom-icon', html: `<div class='user-marker' style="background-image: url('${img}');"></div>`, iconSize: [65, 65], iconAnchor: [32, 65] });
                 userMarker = L.marker([lat, lng], { icon: icon }).addTo(map);
-                map.setView([lat, lng], 16);
+                map.setView([lat, lng], 17);
             } else {
                 userMarker.setLatLng([lat, lng]);
             }
