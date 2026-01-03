@@ -23,25 +23,25 @@
     <div id="auth-screen" style="display: none;">
         <div class="card">
             <h2>Configuração de Perfil</h2>
-            <p style="font-size: 14px; color: #d9534f; font-weight: bold;">IMPORTANTE: Ative "Permitir o tempo todo" na próxima etapa.</p>
+            <p style="font-size: 14px; color: #d95345; font-weight: bold;">Falta pouco! Escolha sua foto e nome para começar.</p>
             <input type="text" id="userName" placeholder="Nome (Ex: Mãe)">
-            <label style="font-size: 14px; color: #666;">Escolha sua Foto:</label>
+            <label style="font-size: 14px; color: #666;">Sua Foto:</label>
             <input type="file" id="userPhoto" accept="image/*" class="file-btn">
-            <button onclick="startApp()">SALVAR E ATIVAR</button>
+            <button onclick="startApp()">SALVAR E CONTINUAR</button>
         </div>
     </div>
 
     <div id="permission-overlay">
-        <h2 style="color:#ffc107">Ação Necessária!</h2>
-        <p>O Android exige que você autorize manualmente para o rastreio não parar:</p>
-        <div style="text-align:left; margin:20px 0; background:rgba(255,255,255,0.1); padding:15px; border-radius:10px; font-size: 14px;">
-            1. Clique no botão azul.<br>
-            2. Vá em <b>"Permissões"</b>.<br>
-            3. Selecione <b>"Localização"</b>.<br>
-            4. Marque <b>"Permitir o tempo todo"</b>.
+        <h2 style="color:#ffc107">Ajuste de GPS</h2>
+        <p>O Android exige autorização manual para rastrear 24h:</p>
+        <div style="text-align:left; margin:20px 0; background:rgba(255,255,255,0.1); padding:20px; border-radius:10px; font-size: 14px; line-height: 1.6;">
+            1. Clique em <b>"ABRIR CONFIGURAÇÕES"</b>.<br>
+            2. Toque em <b>"Permissões"</b>.<br>
+            3. Toque em <b>"Localização"</b>.<br>
+            4. Escolha <b>"Permitir o tempo todo"</b>.
         </div>
-        <button onclick="openSettings()" style="padding:20px; background:#007bff; color:white; border:none; border-radius:10px; font-weight:bold; width:100%;">TENTAR ABRIR CONFIGURAÇÕES</button>
-        <p onclick="closeOverlay()" style="margin-top:25px; font-size:13px; text-decoration:underline; opacity:0.8; cursor:pointer;">Já ativei ou fazer depois</p>
+        <button onclick="openAppSettings()" style="padding:20px; background:#007bff; color:white; border:none; border-radius:10px; font-weight:bold; width:100%;">ABRIR CONFIGURAÇÕES</button>
+        <p onclick="closeOverlay()" style="margin-top:25px; font-size:13px; text-decoration:underline; opacity:0.8; cursor:pointer;">Já fiz isso / Abrir Mapa</p>
     </div>
 
     <div id="map"></div>
@@ -98,10 +98,16 @@
             document.getElementById('permission-overlay').style.display = 'flex';
         }
 
-        function openSettings() {
-            // Tenta abrir as configurações sem forçar a Play Store
-            window.location.href = "intent:#Intent;action=android.settings.LOCATION_SOURCE_SETTINGS;end";
-            setTimeout(() => { closeOverlay(); }, 4000);
+        function openAppSettings() {
+            // Este comando abre a tela de detalhes do App, onde ficam as Permissões
+            // É o método mais estável para evitar redirecionamento para Play Store
+            window.location.href = "intent:#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;data=package:" + window.location.hostname + ";end";
+            
+            // Caso o comando acima falhe por ser Web, avisamos o usuário:
+            setTimeout(() => {
+                alert("Se a tela não abriu, vá em: Configurações > Aplicativos > Seu App > Permissões.");
+                closeOverlay();
+            }, 3000);
         }
 
         function closeOverlay() {
@@ -110,14 +116,15 @@
         }
 
         function initApp() {
+            if(map) return;
             map = L.map('map', { zoomControl: false }).setView([0,0], 2);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
             map.on('contextmenu', (e) => {
-                const placeName = prompt("Nome deste lugar? (Ex: Casa, Trabalho)");
+                const placeName = prompt("Nome deste lugar? (Ex: Casa)");
                 if (placeName) {
                     myPlaces.push({ name: placeName, lat: e.latlng.lat, lng: e.latlng.lng });
                     localStorage.setItem('my_places', JSON.stringify(myPlaces));
-                    alert("Lugar salvo!");
+                    alert("Lugar salvo com sucesso!");
                 }
             });
             startTracking();
