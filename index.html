@@ -6,37 +6,39 @@
     <title>Família VIP Tracker</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background: #e5e5e5; }
-        #map { height: 100vh; width: 100vw; background: #e5e5e5; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        #map { height: 100vh; width: 100vw; background: #ddd; }
         
-        /* Bolha VIP com Foto e Cores */
-        .marker-container { width: 60px; height: 60px; position: relative; }
+        /* Bolha VIP com Foto */
+        .marker-container { width: 50px; height: 50px; position: relative; }
         .user-marker { 
-            width: 52px; height: 52px; border-radius: 50%; border: 3px solid #fff; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex;
+            width: 50px; height: 50px; border-radius: 50%; border: 3px solid white; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: flex;
             align-items: center; justify-content: center;
-            font-weight: bold; color: white; background-size: cover; background-position: center;
-            overflow: hidden; background-color: #444;
+            font-weight: bold; color: white; background-size: cover; 
+            background-position: center; background-color: #444;
+            overflow: hidden;
         }
         .user-label {
-            background: rgba(0,0,0,0.8); color: #fff; padding: 2px 8px;
-            border-radius: 10px; font-size: 10px; position: absolute; 
-            bottom: -18px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+            background: rgba(0,0,0,0.7); color: white; padding: 2px 8px;
+            border-radius: 10px; font-size: 11px; white-space: nowrap;
+            position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
         }
 
+        /* Tela de Entrada VIP */
         #auth-screen { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: #fff; z-index: 9999; display: none; 
+            background: white; z-index: 9999; display: none; 
             flex-direction: column; align-items: center; justify-content: center; 
         }
-        .card { width: 85%; max-width: 350px; text-align: center; }
-        input, .file-btn { padding: 15px; border-radius: 12px; border: 1px solid #ddd; margin-bottom: 10px; width: 100%; box-sizing: border-box; }
-        button { padding: 15px; background: #000; color: white; border: none; border-radius: 12px; width: 100%; font-weight: bold; cursor: pointer; }
+        .card { width: 85%; max-width: 400px; text-align: center; }
+        input, .file-btn { padding: 15px; border-radius: 12px; border: 1px solid #ccc; margin-bottom: 12px; width: 100%; box-sizing: border-box; }
+        button { padding: 18px; background: #000; color: white; border: none; border-radius: 12px; width: 100%; font-weight: bold; cursor: pointer; }
         
         .btn-float { 
             position: fixed; top: 20px; right: 20px; z-index: 1000;
             background: white; border: none; border-radius: 50%; width: 50px; height: 50px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-size: 20px; display: flex; align-items: center; justify-content: center;
         }
     </style>
 </head>
@@ -44,10 +46,11 @@
 
     <div id="auth-screen">
         <div class="card">
-            <h2 style="letter-spacing:-1px">VIP TRACKER</h2>
+            <h2 style="letter-spacing: -1px;">VIP TRACKER</h2>
+            <p style="color: #666; margin-bottom: 20px;">Configure seu perfil familiar</p>
             <input type="text" id="userName" placeholder="Seu Nome">
             <input type="file" id="userPhoto" accept="image/*" class="file-btn">
-            <button onclick="salvar()">ENTRAR</button>
+            <button onclick="salvar()">SALVAR E ENTRAR</button>
         </div>
     </div>
 
@@ -69,13 +72,12 @@
         const db = firebase.database();
         let map, userName, userPhoto;
         let markers = {};
-        let historyLines = {};
-        let activeUserHistory = null;
-        const cores = ['#E91E63', '#2196F3', '#4CAF50', '#FF9800', '#9C27B0'];
+        let historyLines = {}; // Guarda as linhas de histórico na tela
+        const cores = ['#FF5722', '#2196F3', '#4CAF50', '#9C27B0', '#FFC107', '#E91E63'];
 
         window.onload = () => {
             userName = localStorage.getItem('family_user');
-            userPhoto = localStorage.getItem('user_photo_v3');
+            userPhoto = localStorage.getItem('family_photo_v3');
             if (userName) initApp();
             else document.getElementById('auth-screen').style.display = 'flex';
         };
@@ -83,7 +85,7 @@
         function salvar() {
             const name = document.getElementById('userName').value.trim();
             const file = document.getElementById('userPhoto').files[0];
-            if (!name) return;
+            if (!name) return alert("Por favor, digite seu nome.");
 
             if (file) {
                 const reader = new FileReader();
@@ -92,10 +94,10 @@
                     img.src = e.target.result;
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        canvas.width = 100; canvas.height = 100;
-                        canvas.getContext('2d').drawImage(img, 0, 0, 100, 100);
+                        canvas.width = 120; canvas.height = 120;
+                        canvas.getContext('2d').drawImage(img, 0, 0, 120, 120);
                         localStorage.setItem('family_user', name);
-                        localStorage.setItem('user_photo_v3', canvas.toDataURL('image/jpeg', 0.6));
+                        localStorage.setItem('family_photo_v3', canvas.toDataURL('image/jpeg', 0.7));
                         location.reload();
                     };
                 };
@@ -107,67 +109,73 @@
         }
 
         function initApp() {
-            // USANDO SERVIDOR DO GOOGLE PARA O MAPA NÃO FICAR CINZA
             map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0,0], 15);
-            L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-            }).addTo(map);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-            limparAntigos();
-            sync();
-            track();
+            limparHistorico48h();
+            syncData();
+            startTracking();
         }
 
-        function limparAntigos() {
-            const limite = Date.now() - (48 * 60 * 60 * 1000);
+        function limparHistorico48h() {
+            const tempoLimite = Date.now() - (48 * 60 * 60 * 1000);
             db.ref('familia').once('value', snap => {
-                snap.forEach(u => {
-                    u.child('trajetos').forEach(p => {
-                        if (p.val().t < limite) p.ref.remove();
+                snap.forEach(user => {
+                    user.child('trajetos').forEach(ponto => {
+                        if (ponto.val().t < tempoLimite) ponto.ref.remove();
                     });
                 });
             });
         }
 
-        function sync() {
+        function syncData() {
             db.ref('familia').on('value', snap => {
                 const data = snap.val();
                 for (let id in data) {
                     const u = data[id];
-                    const cor = cores[Math.abs(id.length) % cores.length];
+                    const userColor = cores[Math.abs(id.length) % cores.length];
 
                     if (markers[id]) {
                         markers[id].setLatLng([u.lat, u.lng]);
                     } else {
                         const iconHtml = u.photo 
-                            ? `<div class="user-marker" style="background-image:url('${u.photo}'); border-color:${cor}"></div>`
-                            : `<div class="user-marker" style="background-color:${cor}">${id.substring(0,2)}</div>`;
+                            ? `<div class="user-marker" style="background-image:url('${u.photo}'); border-color:${userColor}"></div>`
+                            : `<div class="user-marker" style="background-color:${userColor}">${id.substring(0,2).toUpperCase()}</div>`;
 
                         markers[id] = L.marker([u.lat, u.lng], {
                             icon: L.divIcon({
-                                className: 'c-icon',
-                                html: `<div class="marker-container">${iconHtml}<div class="user-label" style="background:${cor}">${id}</div></div>`,
-                                iconSize: [60, 60], iconAnchor: [30, 60]
+                                className: 'custom-icon',
+                                html: `<div class="marker-container">${iconHtml}<div class="user-label" style="background:${userColor}">${id}</div></div>`,
+                                iconSize: [50, 50], iconAnchor: [25, 50]
                             })
-                        }).addTo(map).on('click', () => toggleHist(id, u.trajetos, cor));
+                        }).addTo(map).on('click', () => toggleHistorico(id, u.trajetos, userColor));
                     }
                 }
             });
         }
 
-        function toggleHist(id, trajetos, cor) {
+        function toggleHistorico(id, trajetos, cor) {
+            // Se já tiver uma linha para esse usuário, removemos (clique alterna On/Off)
             if (historyLines[id]) {
                 map.removeLayer(historyLines[id]);
                 delete historyLines[id];
                 return;
             }
-            if (!trajetos) return;
-            const pts = Object.values(trajetos).map(p => [p.lat, p.lng]);
-            historyLines[id] = L.polyline(pts, {color: cor, weight: 3, dashArray: '5,10'}).addTo(map);
-            alert("Rastro de 48h de " + id);
+
+            if (!trajetos) return alert("Sem histórico para " + id);
+
+            const pontos = Object.values(trajetos).map(p => [p.lat, p.lng]);
+            historyLines[id] = L.polyline(pontos, {
+                color: cor,
+                weight: 4,
+                opacity: 0.6,
+                dashArray: '10, 10' // Linha pontilhada para o histórico
+            }).addTo(map);
+            
+            alert("Mostrando rastro das últimas 48h de " + id);
         }
 
-        function track() {
+        function startTracking() {
             navigator.geolocation.watchPosition(p => {
                 const { latitude, longitude } = p.coords;
                 const r = db.ref('familia/' + userName);
