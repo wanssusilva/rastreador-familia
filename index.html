@@ -3,27 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Life VIP Tracker</title>
+    <title>Life VIP Pro</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div id="login-screen" class="modal-overlay">
-        <div class="modal-card">
-            <h2>Life VIP</h2>
-            <p>Digite seu nome para entrar no círculo familiar</p>
-            <input type="text" id="nameInput" placeholder="Ex: Leandro, Maria...">
-            <button onclick="entrarNoApp()">ATIVAR RASTREADOR</button>
+    <div id="login-screen" class="overlay-entrada">
+        <div class="card-login">
+            <h1>Life VIP</h1>
+            <p>Conecte-se com sua família</p>
+            <input type="text" id="nameInput" placeholder="Seu nome">
+            <button onclick="fazerLogin()">ATIVAR RASTREADOR</button>
         </div>
     </div>
 
-    <div id="alert-box"></div>
+    <div class="status-bar">Círculo Familiar Ativo</div>
 
-    <div class="map-controls">
-        <button class="control-btn" onclick="focarFamilia()" title="Ver Todos">👥</button>
-        <button class="control-btn" onclick="location.reload()" title="Atualizar">🔄</button>
+    <div class="painel-controles">
+        <button class="btn-circular" onclick="focarGeral()">👥</button>
+        <button class="btn-circular" onclick="location.reload()">🔄</button>
     </div>
 
     <div id="map"></div>
