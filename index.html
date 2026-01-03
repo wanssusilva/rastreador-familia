@@ -3,54 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VIP Family Tracker</title>
+    <title>Life VIP Tracker</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; background: #f0f2f5; overflow: hidden; }
-        #map { height: 100vh; width: 100vw; z-index: 1; background: #e0e0e0; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; overflow: hidden; }
+        #map { height: 100vh; width: 100vw; z-index: 1; background: #e9ecef; }
 
-        /* Estilo das Bolhas de Usuário */
-        .marker-container { position: relative; width: 50px; height: 50px; }
-        .user-bubble { 
-            width: 46px; height: 46px; border-radius: 50%; border: 3px solid #fff;
-            box-shadow: 0 0 15px rgba(0,0,0,0.1); display: flex;
+        /* Estilo das Bolhas (Marcadores) */
+        .marker-vip { position: relative; width: 55px; height: 55px; }
+        .bubble { 
+            width: 50px; height: 50px; border-radius: 50%; border: 3px solid #fff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: flex;
             align-items: center; justify-content: center; font-weight: 800;
-            color: white; font-size: 16px; transition: transform 0.2s;
+            color: white; font-size: 18px; transition: all 0.3s ease;
         }
-        .user-name-tag {
-            position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%);
-            background: rgba(44, 62, 80, 0.9); color: white; padding: 3px 10px;
-            border-radius: 12px; font-size: 10px; font-weight: 600; white-space: nowrap;
+        .name-tag {
+            position: absolute; bottom: -28px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8); color: white; padding: 3px 12px;
+            border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap;
         }
 
-        /* Tela de Entrada (Apenas 1ª vez) */
-        #login-overlay { 
+        /* Sistema de Notificações Pop-up */
+        #notification-toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 10000; background: #333; color: white; padding: 12px 25px;
+            border-radius: 30px; font-size: 14px; font-weight: 600;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: none; animation: slideDown 0.5s ease;
+        }
+
+        @keyframes slideDown { from { top: -60px; } to { top: 20px; } }
+
+        /* Tela de Entrada */
+        #auth-screen { 
             position: fixed; inset: 0; background: #fff; z-index: 9999; 
             display: none; flex-direction: column; align-items: center; justify-content: center; 
         }
-        .login-box { width: 85%; max-width: 350px; text-align: center; }
-        input { width: 100%; padding: 15px; margin: 20px 0; border-radius: 12px; border: 1px solid #ddd; font-size: 16px; outline: none; box-sizing: border-box; }
-        button.entry-btn { width: 100%; padding: 15px; border-radius: 12px; border: none; background: #2c3e50; color: white; font-weight: 700; cursor: pointer; }
+        .box { width: 85%; max-width: 380px; text-align: center; }
+        input { width: 100%; padding: 18px; margin: 25px 0; border-radius: 15px; border: 2px solid #eee; font-size: 16px; box-sizing: border-box; }
+        .btn-main { width: 100%; padding: 18px; border-radius: 15px; border: none; background: #1a1a1a; color: white; font-weight: 700; cursor: pointer; font-size: 16px; }
 
-        /* Controles Flutuantes */
-        .map-ui { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
-        .ui-btn { width: 50px; height: 50px; border-radius: 15px; border: none; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); font-size: 20px; cursor: pointer; }
+        .controls { position: fixed; top: 80px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
+        .btn-ui { width: 50px; height: 50px; border-radius: 15px; border: none; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); font-size: 20px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div id="login-overlay">
-        <div class="login-box">
-            <h2 style="letter-spacing:-1px">Família Tracker</h2>
-            <p style="color:#7f8c8d; font-size:14px">Digite seu nome para começar</p>
-            <input type="text" id="inputName" placeholder="Seu nome">
-            <button class="entry-btn" onclick="startApp()">ENTRAR AGORA</button>
+    <div id="notification-toast"></div>
+
+    <div id="auth-screen">
+        <div class="box">
+            <h1 style="letter-spacing:-1px">Life VIP</h1>
+            <p style="color:#666">Rastreamento familiar em tempo real</p>
+            <input type="text" id="userName" placeholder="Qual seu nome?">
+            <button class="btn-main" onclick="cadastrar()">ATIVAR MEU PERFIL</button>
         </div>
     </div>
 
-    <div class="map-ui">
-        <button class="ui-btn" onclick="focusAll()">👥</button>
-        <button class="ui-btn" onclick="location.reload()">🔄</button>
+    <div class="controls">
+        <button class="btn-ui" onclick="focusAll()">👥</button>
+        <button class="btn-ui" onclick="location.reload()">🔄</button>
     </div>
     
     <div id="map"></div>
@@ -68,91 +80,97 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        let map, myName, markers = {}, activeTrail = null;
-        const palette = ['#3498db', '#e74c3c', '#2ecc71', '#9b59b6', '#f1c40f'];
+        let map, myId, markers = {}, activeRoute = null;
+        const colors = ['#6200ee', '#03dac6', '#ff0266', '#ffde03', '#00c853'];
 
         window.onload = () => {
-            myName = localStorage.getItem('user_tracker_name');
-            if (myName) initMap();
-            else document.getElementById('login-overlay').style.display = 'flex';
+            myId = localStorage.getItem('life_vip_id');
+            if (myId) startTracker();
+            else document.getElementById('auth-screen').style.display = 'flex';
         };
 
-        function startApp() {
-            const n = document.getElementById('inputName').value.trim();
-            if (n) { localStorage.setItem('user_tracker_name', n); location.reload(); }
+        function cadastrar() {
+            const name = document.getElementById('userName').value.trim();
+            if (name) {
+                localStorage.setItem('life_vip_id', name);
+                location.reload();
+            }
         }
 
-        function initMap() {
-            // MAPA VOYAGER: Limpo, agradável e sem detalhes poluídos
-            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0,0], 15);
-            
-            const tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                timeout: 5000 // Tenta carregar por 5 segundos antes de erro
-            }).addTo(map);
+        function showToast(msg) {
+            const toast = document.getElementById('notification-toast');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 4000);
+        }
 
-            // AUTO-RECARREGAMENTO: Se o mapa falhar ao carregar, ele tenta de novo sozinho
-            tiles.on('tileerror', () => {
-                console.log("Erro ao carregar mapa, tentando novamente...");
-                setTimeout(() => tiles.redraw(), 3000);
+        function startTracker() {
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0,0], 15);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
+
+            // Escuta novos membros e atualizações
+            db.ref('familia').on('child_added', snap => {
+                if (snap.key !== myId) showToast(`🚀 ${snap.key} entrou no grupo!`);
             });
 
             syncFamily();
-            trackMe();
-            cleanOld(48);
+            watchMe();
+            cleanup(48);
         }
 
         function syncFamily() {
             db.ref('familia').on('value', snap => {
-                const data = snap.val();
-                for (let id in data) {
-                    const u = data[id];
-                    const color = palette[Math.abs(id.length) % palette.length];
+                const users = snap.val();
+                for (let id in users) {
+                    const data = users[id];
+                    const color = colors[Math.abs(id.length) % colors.length];
 
                     if (markers[id]) {
-                        markers[id].setLatLng([u.lat, u.lng]);
+                        markers[id].setLatLng([data.lat, data.lng]);
                     } else {
-                        markers[id] = L.marker([u.lat, u.lng], {
+                        markers[id] = L.marker([data.lat, data.lng], {
                             icon: L.divIcon({
-                                className: 'custom-div-icon',
-                                html: `<div class="marker-container">
-                                        <div class="user-bubble" style="background:${color}">${id.substring(0,2).toUpperCase()}</div>
-                                        <div class="user-name-tag">${id}</div>
+                                className: 'vip-icon',
+                                html: `<div class="marker-vip">
+                                        <div class="bubble" style="background:${color}">${id.substring(0,2).toUpperCase()}</div>
+                                        <div class="name-tag">${id}</div>
                                        </div>`,
-                                iconSize: [50, 50], iconAnchor: [25, 50]
+                                iconSize: [55, 55], iconAnchor: [27, 55]
                             })
-                        }).addTo(map).on('click', () => showHistory(id, u.trajetos, color));
+                        }).addTo(map).on('click', () => drawRoute(id, data.trajetos, color));
                     }
                 }
             });
         }
 
-        function showHistory(id, pts, color) {
-            if (activeTrail) map.removeLayer(activeTrail);
-            if (!pts) return;
-            const path = Object.values(pts).map(p => [p.lat, p.lng]);
-            activeTrail = L.polyline(path, {color: color, weight: 4, opacity: 0.6, dashArray: '5, 10'}).addTo(map);
+        function drawRoute(id, logs, color) {
+            if (activeRoute) map.removeLayer(activeRoute);
+            if (!logs) return;
+            const points = Object.values(logs).map(l => [l.lat, l.lng]);
+            activeRoute = L.polyline(points, {color: color, weight: 5, opacity: 0.4, dashArray: '10, 10'}).addTo(map);
+            showToast(`Exibindo rastro de ${id}`);
         }
 
-        function trackMe() {
+        function watchMe() {
             navigator.geolocation.watchPosition(p => {
                 const { latitude, longitude } = p.coords;
-                const r = db.ref('familia/' + myName);
+                const r = db.ref('familia/' + myId);
                 r.update({ lat: latitude, lng: longitude });
                 r.child('trajetos').push({ lat: latitude, lng: longitude, t: Date.now() });
                 if(Object.keys(markers).length <= 1) map.panTo([latitude, longitude]);
             }, null, { enableHighAccuracy: true });
         }
 
-        function cleanOld(hrs) {
-            const limit = Date.now() - (hrs * 60 * 60 * 1000);
+        function cleanup(hrs) {
+            const cut = Date.now() - (hrs * 60 * 60 * 1000);
             db.ref('familia').once('value', s => {
-                s.forEach(u => u.child('trajetos').forEach(p => { if(p.val().t < limit) p.ref.remove(); }));
+                s.forEach(u => u.child('trajetos').forEach(p => { if(p.val().t < cut) p.ref.remove(); }));
             });
         }
 
         function focusAll() {
-            const m = Object.values(markers);
-            if (m.length > 0) map.fitBounds(new L.featureGroup(m).getBounds().pad(0.3));
+            const group = new L.featureGroup(Object.values(markers));
+            if (group.getLayers().length > 0) map.fitBounds(group.getBounds().pad(0.3));
         }
     </script>
 </body>
