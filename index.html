@@ -9,47 +9,51 @@
         body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background: #f0f2f5; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
-        /* Estilo da Bolha com Foto */
+        /* Estética Premium da Bolha */
         .user-marker { 
-            width: 55px; height: 55px; border-radius: 50%; border: 3px solid white; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3); background-size: cover; 
-            background-position: center; position: relative; background-color: #ccc;
+            width: 60px; height: 60px; border-radius: 50%; border: 4px solid white; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4); 
+            background-size: cover; background-position: center; 
+            background-repeat: no-repeat; position: relative;
+            background-color: #555; /* Fundo caso a foto falhe */
         }
         .user-label {
-            background: rgba(0,0,0,0.8); color: white; padding: 2px 8px;
-            border-radius: 10px; font-size: 11px; white-space: nowrap;
-            position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%);
-            font-weight: bold; border: 1px solid rgba(255,255,255,0.3);
+            background: rgba(0,0,0,0.85); color: white; padding: 3px 10px;
+            border-radius: 12px; font-size: 12px; white-space: nowrap;
+            position: absolute; bottom: -28px; left: 50%; transform: translateX(-50%);
+            font-weight: bold; border: 1px solid rgba(255,255,255,0.2);
+            text-transform: uppercase; letter-spacing: 0.5px;
         }
 
         #auth-screen { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: white; z-index: 9999; display: none; 
+            background: #fff; z-index: 9999; display: none; 
             flex-direction: column; align-items: center; justify-content: center; 
         }
-        .card { width: 85%; max-width: 400px; text-align: center; }
-        input, .file-btn { padding: 15px; border-radius: 12px; border: 2px solid #eee; margin-bottom: 10px; width: 100%; box-sizing: border-box; font-size: 16px; display: block; }
-        button { padding: 18px; background: #28a745; color: white; border: none; border-radius: 12px; font-weight: bold; width: 100%; cursor: pointer; }
+        .card { width: 85%; max-width: 400px; text-align: center; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        input, .file-btn { padding: 15px; border-radius: 12px; border: 2px solid #ddd; margin-bottom: 15px; width: 100%; box-sizing: border-box; font-size: 16px; display: block; }
+        button { padding: 18px; background: #000; color: white; border: none; border-radius: 12px; font-weight: bold; width: 100%; cursor: pointer; transition: 0.3s; }
         
-        .control-btns { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
-        .btn-float { background: white; border: none; border-radius: 50%; width: 50px; height: 50px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .control-btns { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 12px; }
+        .btn-float { background: white; border: none; border-radius: 50%; width: 55px; height: 55px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
     <div id="auth-screen">
         <div class="card">
-            <h2>Rastreador Familiar</h2>
-            <input type="text" id="userName" placeholder="Seu Nome">
-            <label style="font-size: 13px; color: #666;">Sua Foto:</label>
+            <h2 style="margin-bottom: 5px;">Família VIP</h2>
+            <p style="color: #888; margin-bottom: 20px;">Sua localização em tempo real</p>
+            <input type="text" id="userName" placeholder="Qual seu nome?">
+            <label style="font-size: 14px; font-weight: bold; color: #444; display: block; margin-bottom: 8px;">ESCOLHA SUA MELHOR FOTO:</label>
             <input type="file" id="userPhoto" accept="image/*" class="file-btn">
-            <button onclick="uploadAndStart()">ENTRAR NO MAPA</button>
+            <button onclick="processPhotoAndStart()">ACESSAR MAPA</button>
         </div>
     </div>
 
     <div class="control-btns">
-        <button class="btn-float" onclick="focusFamily()" title="Focar Família">👥</button>
-        <button class="btn-float" onclick="clearAllHistory()" title="Limpar Tudo">🗑️</button>
+        <button class="btn-float" onclick="focusFamily()">👥</button>
+        <button class="btn-float" onclick="location.reload()">🔄</button>
     </div>
     
     <div id="map"></div>
@@ -74,40 +78,45 @@
         let map, userName, userPhoto;
         let markers = {};
         let historyLines = {}; 
-        let activeHistoryUser = null; 
-        let firstZoom = true;
+        let activeHistoryUser = null;
 
         window.onload = () => {
             userName = localStorage.getItem('family_user');
-            userPhoto = localStorage.getItem('family_photo_cloud');
+            userPhoto = localStorage.getItem('family_photo_vip');
             if (userName) initApp();
             else document.getElementById('auth-screen').style.display = 'flex';
         };
 
-        function uploadAndStart() {
+        function processPhotoAndStart() {
             const name = document.getElementById('userName').value.trim();
-            const photoFile = document.getElementById('userPhoto').files[0];
+            const file = document.getElementById('userPhoto').files[0];
             if (!name) return alert("Digite seu nome");
 
-            if (photoFile) {
+            if (file) {
                 const reader = new FileReader();
-                reader.onloadend = () => {
+                reader.onload = (e) => {
                     const img = new Image();
-                    img.src = reader.result;
+                    img.src = e.target.result;
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
+                        const size = 150; // Tamanho ideal para estética e performance
+                        canvas.width = size; canvas.height = size;
                         const ctx = canvas.getContext('2d');
-                        canvas.width = 120; canvas.height = 120;
-                        ctx.drawImage(img, 0, 0, 120, 120);
-                        const smallPhoto = canvas.toDataURL('image/jpeg', 0.8);
+                        // Corta em círculo perfeito no canvas
+                        ctx.beginPath();
+                        ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
+                        ctx.clip();
+                        ctx.drawImage(img, 0, 0, size, size);
+                        
+                        const processedImg = canvas.toDataURL('image/jpeg', 0.85);
                         localStorage.setItem('family_user', name);
-                        localStorage.setItem('family_photo_cloud', smallPhoto);
-                        userName = name; userPhoto = smallPhoto;
+                        localStorage.setItem('family_photo_vip', processedImg);
+                        userName = name; userPhoto = processedImg;
                         document.getElementById('auth-screen').style.display = 'none';
                         initApp();
                     };
                 };
-                reader.readAsDataURL(photoFile);
+                reader.readAsDataURL(file);
             } else {
                 localStorage.setItem('family_user', name);
                 userName = name;
@@ -117,11 +126,10 @@
         }
 
         function initApp() {
-            map = L.map('map', { zoomControl: false }).setView([0,0], 15);
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0,0], 15);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
             startSync();
             startTracking();
-            limparHistoricoAntigo();
         }
 
         function startSync() {
@@ -129,93 +137,57 @@
                 const data = snapshot.val();
                 for (let id in data) {
                     const { lat, lng, photo, trajetos } = data[id];
-                    const imgUrl = photo || `https://ui-avatars.com/api/?name=${id}&background=random`;
+                    const finalPhoto = photo || `https://ui-avatars.com/api/?name=${id}&background=random&color=fff&size=128`;
                     
                     if (markers[id]) {
                         markers[id].setLatLng([lat, lng]);
-                        // Atualização forçada da imagem no elemento HTML
-                        const iconDiv = markers[id].getElement().querySelector('.user-marker');
-                        if (iconDiv) iconDiv.style.backgroundImage = `url('${imgUrl}')`;
+                        // Atualiza a imagem de fundo diretamente no DOM para garantir estética
+                        const el = markers[id].getElement().querySelector('.user-marker');
+                        if(el) el.style.backgroundImage = `url('${finalPhoto}')`;
                     } else {
                         const icon = L.divIcon({
-                            className: 'custom-div-icon',
-                            html: `<div class="user-marker" style="background-image: url('${imgUrl}')"><div class="user-label">${id}</div></div>`,
-                            iconSize: [55, 55], iconAnchor: [27, 55]
+                            className: 'custom-icon',
+                            html: `<div class="user-marker" style="background-image: url('${finalPhoto}')">
+                                     <div class="user-label">${id}</div>
+                                   </div>`,
+                            iconSize: [60, 60], iconAnchor: [30, 60]
                         });
-                        // Adiciona evento de clique para abrir histórico
-                        markers[id] = L.marker([lat, lng], { icon }).addTo(map).on('click', () => toggleUserHistory(id));
+                        markers[id] = L.marker([lat, lng], { icon }).addTo(map).on('click', () => toggleHistory(id));
                     }
 
-                    // Se o histórico desse usuário estiver ativo, redesenha a linha
                     if (activeHistoryUser === id && trajetos) {
-                        const pontos = Object.values(trajetos).map(p => [p.lat, p.lng]);
+                        const path = Object.values(trajetos).map(p => [p.lat, p.lng]);
                         if (historyLines[id]) map.removeLayer(historyLines[id]);
-                        historyLines[id] = L.polyline(pontos, { color: '#007bff', weight: 4, opacity: 0.6, dashArray: '5, 10' }).addTo(map);
+                        historyLines[id] = L.polyline(path, { color: '#000', weight: 3, opacity: 0.4, dashArray: '8, 12' }).addTo(map);
                     }
                 }
             });
-        }
-
-        function toggleUserHistory(userId) {
-            // Se clicar no mesmo, desliga. Se clicar em outro, troca.
-            if (activeHistoryUser === userId) {
-                if (historyLines[userId]) map.removeLayer(historyLines[userId]);
-                activeHistoryUser = null;
-            } else {
-                // Limpa histórico anterior
-                if (activeHistoryUser && historyLines[activeHistoryUser]) {
-                    map.removeLayer(historyLines[activeHistoryUser]);
-                }
-                activeHistoryUser = userId;
-                alert("Mostrando rastro de: " + userId);
-            }
         }
 
         function startTracking() {
             navigator.geolocation.watchPosition(pos => {
                 const { latitude, longitude } = pos.coords;
-                const hoje = new Date().toISOString().split('T')[0];
-                
                 db.ref('familia/' + userName).update({
                     lat: latitude, lng: longitude, 
                     photo: userPhoto || null,
                     lastUpdate: new Date().getTime()
                 });
-
                 db.ref('familia/' + userName + '/trajetos').push({
-                    lat: latitude, lng: longitude, date: hoje, time: new Date().getTime()
+                    lat: latitude, lng: longitude, date: new Date().toISOString().split('T')[0]
                 });
-
-                if (firstZoom) {
-                    map.setView([latitude, longitude], 16);
-                    firstZoom = false;
-                }
+                if(Object.keys(markers).length === 1) map.setView([latitude, longitude], 16);
             }, null, { enableHighAccuracy: true });
         }
 
-        function limparHistoricoAntigo() {
-            const doisDiasAtras = new Date();
-            doisDiasAtras.setDate(doisDiasAtras.getDate() - 2);
-            const dataLimite = doisDiasAtras.toISOString().split('T')[0];
-            db.ref('familia/' + userName + '/trajetos').once('value', snapshot => {
-                snapshot.forEach(child => { if (child.val().date < dataLimite) child.ref.remove(); });
-            });
-        }
-
-        function clearAllHistory() {
-            if(confirm("Deseja esconder todos os rastros do mapa?")) {
-                Object.values(historyLines).forEach(line => map.removeLayer(line));
-                activeHistoryUser = null;
-                historyLines = {};
-            }
+        function toggleHistory(id) {
+            if(activeHistoryUser && historyLines[activeHistoryUser]) map.removeLayer(historyLines[activeHistoryUser]);
+            if(activeHistoryUser === id) { activeHistoryUser = null; } 
+            else { activeHistoryUser = id; alert("Histórico de " + id + " ativado."); }
         }
 
         function focusFamily() {
-            const mArray = Object.values(markers);
-            if (mArray.length > 0) {
-                const group = new L.featureGroup(mArray);
-                map.fitBounds(group.getBounds().pad(0.2));
-            }
+            const vals = Object.values(markers);
+            if (vals.length > 0) map.fitBounds(new L.featureGroup(vals).getBounds().pad(0.3));
         }
     </script>
 </body>
