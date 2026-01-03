@@ -9,13 +9,12 @@
         body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background: #f0f2f5; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
-        /* Bolha de Localização com Foto */
         .user-marker {
-            width: 60px; height: 60px;
+            width: 65px; height: 65px;
             border-radius: 50%; border: 4px solid white;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             background-size: cover; background-position: center;
-            position: relative; animation: pulse 2s infinite;
+            position: relative;
         }
         .user-marker::after {
             content: ''; position: absolute; bottom: -12px; left: 50%;
@@ -23,28 +22,21 @@
             border-left: 10px solid transparent; border-right: 10px solid transparent;
             border-top: 12px solid white;
         }
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
 
-        /* Tela de Nome (Persistente) */
         #auth-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: white; z-index: 9999;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
         .card { width: 85%; max-width: 400px; text-align: center; }
-        input { padding: 18px; border-radius: 15px; border: 2px solid #eee; margin-bottom: 15px; width: 100%; font-size: 16px; box-sizing: border-box; }
-        button { padding: 18px; background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; width: 100%; font-size: 16px; cursor: pointer; }
+        input, .file-btn { padding: 15px; border-radius: 12px; border: 2px solid #eee; margin-bottom: 10px; width: 100%; font-size: 15px; box-sizing: border-box; display: block;}
+        button { padding: 18px; background: #28a745; color: white; border: none; border-radius: 12px; font-weight: bold; width: 100%; cursor: pointer; }
         
-        /* Badge de Status Inferior */
         .status-badge {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: white; padding: 15px 30px; border-radius: 50px;
+            background: white; padding: 15px 25px; border-radius: 50px;
             z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-            font-weight: 600; color: #1a1a1a; min-width: 200px; text-align: center;
+            font-weight: 600; text-align: center; min-width: 220px;
         }
     </style>
 </head>
@@ -52,16 +44,16 @@
 
     <div id="auth-screen" style="display: none;">
         <div class="card">
-            <img src="https://cdn-icons-png.flaticon.com/512/854/854878.png" width="80" style="margin-bottom: 20px;">
-            <h2 style="margin-bottom: 10px;">Quem é você?</h2>
-            <p style="color: #666; margin-bottom: 20px;">Isso será pedido apenas uma vez.</p>
-            <input type="text" id="userName" placeholder="Ex: Mãe, Irmã, Wanssu...">
-            <button onclick="startApp()">CONFIGURAR AGORA</button>
+            <h2>Configuração de Perfil</h2>
+            <input type="text" id="userName" placeholder="Nome (Ex: Mãe)">
+            <label style="font-size: 14px; color: #666;">Escolha sua Foto:</label>
+            <input type="file" id="userPhoto" accept="image/*" class="file-btn">
+            <button onclick="startApp()">SALVAR E ENTRAR</button>
         </div>
     </div>
 
     <div id="map"></div>
-    <div id="status" class="status-badge">Detectando posição...</div>
+    <div id="status" class="status-badge">Buscando sinal...</div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
@@ -80,31 +72,53 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        let map, userMarker, userName;
+        let map, userMarker, userName, userPhoto;
+        let myPlaces = JSON.parse(localStorage.getItem('my_places') || '[]');
 
         window.onload = () => {
-            userName = localStorage.getItem('family_gps_user');
-            if (userName) {
-                initApp();
-            } else {
-                document.getElementById('auth-screen').style.display = 'flex';
-            }
+            userName = localStorage.getItem('family_user');
+            userPhoto = localStorage.getItem('family_photo');
+            if (userName) initApp();
+            else document.getElementById('auth-screen').style.display = 'flex';
         };
 
         function startApp() {
-            const val = document.getElementById('userName').value.trim();
-            if (val) {
-                localStorage.setItem('family_gps_user', val);
-                userName = val;
+            const name = document.getElementById('userName').value.trim();
+            const photoFile = document.getElementById('userPhoto').files[0];
+            if (!name) return alert("Digite um nome!");
+
+            localStorage.setItem('family_user', name);
+            userName = name;
+
+            if (photoFile) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    localStorage.setItem('family_photo', reader.result);
+                    userPhoto = reader.result;
+                    document.getElementById('auth-screen').style.display = 'none';
+                    initApp();
+                };
+                reader.readAsDataURL(photoFile);
+            } else {
                 document.getElementById('auth-screen').style.display = 'none';
                 initApp();
             }
         }
 
         function initApp() {
-            // Mapa moderno e limpo (CartoDB)
             map = L.map('map', { zoomControl: false }).setView([0,0], 2);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+            // FUNÇÃO PARA SALVAR LUGAR AO CLICAR
+            map.on('contextmenu', (e) => {
+                const placeName = prompt("Como deseja chamar este lugar? (Ex: Casa, Trabalho)");
+                if (placeName) {
+                    myPlaces.push({ name: placeName, lat: e.latlng.lat, lng: e.latlng.lng });
+                    localStorage.setItem('my_places', JSON.stringify(myPlaces));
+                    alert("Lugar '" + placeName + "' salvo com sucesso!");
+                }
+            });
+
             startTracking();
         }
 
@@ -113,14 +127,20 @@
                 const { latitude, longitude, speed } = pos.coords;
                 const kmh = Math.round((speed || 0) * 3.6);
                 
-                // Inteligência de Movimento
-                let msg = kmh > 12 ? "🚗 No Carro ("+kmh+" km/h)" : (kmh > 2 ? "🚶 Andando" : "📍 Parado");
-                document.getElementById('status').innerText = msg;
+                let currentStatus = kmh > 12 ? "🚗 No Carro ("+kmh+" km/h)" : (kmh > 2 ? "🚶 Andando" : "📍 Parado");
+                
+                // Verifica se está em algum lugar salvo
+                myPlaces.forEach(place => {
+                    const dist = map.distance([latitude, longitude], [place.lat, place.lng]);
+                    if (dist < 80) currentStatus = "📍 Em: " + place.name;
+                });
+
+                document.getElementById('status').innerText = currentStatus;
 
                 db.ref('familia/' + userName).set({
                     lat: latitude, lng: longitude,
-                    status: msg, speed: kmh,
-                    lastSeen: new Date().toLocaleTimeString()
+                    status: currentStatus,
+                    lastUpdate: new Date().toLocaleTimeString()
                 });
 
                 updateMap(latitude, longitude);
@@ -128,12 +148,12 @@
         }
 
         function updateMap(lat, lng) {
-            const photoUrl = 'https://ui-avatars.com/api/?name='+userName+'&background=random&size=128';
+            const img = userPhoto || 'https://ui-avatars.com/api/?name='+userName+'&background=random';
             if (!userMarker) {
                 const icon = L.divIcon({
                     className: 'custom-icon',
-                    html: `<div class='user-marker' style="background-image: url('${photoUrl}');"></div>`,
-                    iconSize: [60, 60], iconAnchor: [30, 60]
+                    html: `<div class='user-marker' style="background-image: url('${img}');"></div>`,
+                    iconSize: [65, 65], iconAnchor: [32, 65]
                 });
                 userMarker = L.marker([lat, lng], { icon: icon }).addTo(map);
                 map.setView([lat, lng], 16);
