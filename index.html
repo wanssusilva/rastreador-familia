@@ -15,10 +15,10 @@
             background-position: center; position: relative; 
         }
         .user-label {
-            background: rgba(0,0,0,0.7); color: white; padding: 2px 8px;
+            background: rgba(0,0,0,0.8); color: white; padding: 2px 8px;
             border-radius: 10px; font-size: 11px; white-space: nowrap;
             position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%);
-            font-weight: bold;
+            font-weight: bold; border: 1px solid rgba(255,255,255,0.3);
         }
 
         #auth-screen { 
@@ -27,16 +27,11 @@
             flex-direction: column; align-items: center; justify-content: center; 
         }
         .card { width: 85%; max-width: 400px; text-align: center; }
-        input { padding: 15px; border-radius: 12px; border: 2px solid #eee; margin-bottom: 10px; width: 100%; box-sizing: border-box; font-size: 16px; }
+        input, .file-btn { padding: 15px; border-radius: 12px; border: 2px solid #eee; margin-bottom: 10px; width: 100%; box-sizing: border-box; font-size: 16px; display: block; }
         button { padding: 18px; background: #28a745; color: white; border: none; border-radius: 12px; font-weight: bold; width: 100%; cursor: pointer; }
         
-        /* Botão para focar na família */
-        .focus-btn {
-            position: fixed; top: 20px; right: 20px; z-index: 1000;
-            background: white; border: none; border-radius: 50%; width: 50px; height: 50px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 24px; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-        }
+        .control-btns { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
+        .btn-float { background: white; border: none; border-radius: 50%; width: 50px; height: 50px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
@@ -44,12 +39,18 @@
     <div id="auth-screen">
         <div class="card">
             <h2>Rastreador Familiar</h2>
-            <input type="text" id="userName" placeholder="Seu Nome (Ex: Pai)">
-            <button onclick="startApp()">ENTRAR NO MAPA</button>
+            <input type="text" id="userName" placeholder="Seu Nome">
+            <label style="font-size: 13px; color: #666;">Sua Foto:</label>
+            <input type="file" id="userPhoto" accept="image/*" class="file-btn">
+            <button onclick="uploadAndStart()">ENTRAR NO MAPA</button>
         </div>
     </div>
 
-    <button class="focus-btn" onclick="focusFamily()">👥</button>
+    <div class="control-btns">
+        <button class="btn-float" onclick="focusFamily()" title="Focar Família">👥</button>
+        <button class="btn-float" onclick="toggleHistory()" id="histBtn" title="Ver Histórico">🕒</button>
+    </div>
+    
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -69,72 +70,87 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        let map, userName;
+        let map, userName, userPhoto;
         let markers = {};
+        let historyLines = {}; // Guarda as linhas de trajeto no mapa
         let pointMarkers = [];
         let firstZoom = true;
+        let showHistory = true;
 
         window.onload = () => {
             userName = localStorage.getItem('family_user');
+            userPhoto = localStorage.getItem('family_photo_cloud');
             if (userName) initApp();
             else document.getElementById('auth-screen').style.display = 'flex';
         };
 
-        function startApp() {
+        function uploadAndStart() {
             const name = document.getElementById('userName').value.trim();
+            const photoFile = document.getElementById('userPhoto').files[0];
             if (!name) return alert("Digite seu nome");
-            localStorage.setItem('family_user', name);
-            userName = name;
-            document.getElementById('auth-screen').style.display = 'none';
-            initApp();
+
+            if (photoFile) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const img = new Image();
+                    img.src = reader.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = 100; canvas.height = 100;
+                        ctx.drawImage(img, 0, 0, 100, 100);
+                        const smallPhoto = canvas.toDataURL('image/jpeg', 0.7);
+                        localStorage.setItem('family_user', name);
+                        localStorage.setItem('family_photo_cloud', smallPhoto);
+                        userName = name; userPhoto = smallPhoto;
+                        document.getElementById('auth-screen').style.display = 'none';
+                        initApp();
+                    };
+                };
+                reader.readAsDataURL(photoFile);
+            } else {
+                localStorage.setItem('family_user', name);
+                userName = name;
+                document.getElementById('auth-screen').style.display = 'none';
+                initApp();
+            }
         }
 
         function initApp() {
-            // Inicia o mapa com zoom de rua (15) em vez de zoom do mundo (2)
             map = L.map('map', { zoomControl: false }).setView([0,0], 15);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
-            
-            map.on('contextmenu', (e) => {
-                const placeName = prompt("Nome deste lugar para todos verem:");
-                if (placeName) {
-                    db.ref('pontos_compartilhados').push({
-                        name: placeName, lat: e.latlng.lat, lng: e.latlng.lng, criadoPor: userName
-                    });
-                }
-            });
-
             startSync();
             startTracking();
+            limparHistoricoAntigo();
         }
 
         function startSync() {
+            // Sincroniza posição atual e histórico
             db.ref('familia').on('value', snapshot => {
                 const data = snapshot.val();
                 for (let id in data) {
-                    const { lat, lng } = data[id];
+                    const { lat, lng, photo, trajetos } = data[id];
+                    const imgUrl = photo || `https://ui-avatars.com/api/?name=${id}&background=random`;
+                    
+                    // 1. Atualiza Marcador Atual
                     if (markers[id]) {
                         markers[id].setLatLng([lat, lng]);
+                        markers[id].getElement().querySelector('.user-marker').style.backgroundImage = `url('${imgUrl}')`;
                     } else {
                         const icon = L.divIcon({
                             className: 'custom-div-icon',
-                            html: `<div class="user-marker" style="background-image: url('https://ui-avatars.com/api/?name=${id}&background=random&color=fff')"><div class="user-label">${id}</div></div>`,
+                            html: `<div class="user-marker" style="background-image: url('${imgUrl}')"><div class="user-label">${id}</div></div>`,
                             iconSize: [55, 55], iconAnchor: [27, 55]
                         });
                         markers[id] = L.marker([lat, lng], { icon }).addTo(map);
                     }
-                }
-            });
 
-            db.ref('pontos_compartilhados').on('value', snapshot => {
-                pointMarkers.forEach(m => map.removeLayer(m));
-                pointMarkers = [];
-                const data = snapshot.val();
-                for (let id in data) {
-                    const p = data[id];
-                    const circle = L.circle([p.lat, p.lng], {
-                        color: '#ff4757', fillColor: '#ff6b81', fillOpacity: 0.3, radius: 100
-                    }).addTo(map).bindPopup(`<b>${p.name}</b><br>Salvo por: ${p.criadoPor}`);
-                    pointMarkers.push(circle);
+                    // 2. Desenha Linha de Histórico (2 dias)
+                    if (trajetos && showHistory) {
+                        const pontos = Object.values(trajetos).map(p => [p.lat, p.lng]);
+                        if (historyLines[id]) map.removeLayer(historyLines[id]);
+                        historyLines[id] = L.polyline(pontos, { color: id === userName ? '#28a745' : '#007bff', weight: 3, opacity: 0.5, dashArray: '5, 10' }).addTo(map);
+                    }
                 }
             });
         }
@@ -142,11 +158,20 @@
         function startTracking() {
             navigator.geolocation.watchPosition(pos => {
                 const { latitude, longitude } = pos.coords;
-                db.ref('familia/' + userName).set({
-                    lat: latitude, lng: longitude, lastUpdate: new Date().getTime()
+                const hoje = new Date().toISOString().split('T')[0];
+                
+                // Atualiza posição tempo real
+                db.ref('familia/' + userName).update({
+                    lat: latitude, lng: longitude, 
+                    photo: userPhoto || null,
+                    lastUpdate: new Date().getTime()
                 });
 
-                // Só centraliza automaticamente na primeira vez que abre o app
+                // Salva no histórico (só se mover mais de 20 metros para não encher o banco)
+                db.ref('familia/' + userName + '/trajetos').push({
+                    lat: latitude, lng: longitude, date: hoje, time: new Date().getTime()
+                });
+
                 if (firstZoom) {
                     map.setView([latitude, longitude], 16);
                     firstZoom = false;
@@ -154,9 +179,33 @@
             }, null, { enableHighAccuracy: true });
         }
 
+        function limparHistoricoAntigo() {
+            const doisDiasAtras = new Date();
+            doisDiasAtras.setDate(doisDiasAtras.getDate() - 2);
+            const dataLimite = doisDiasAtras.toISOString().split('T')[0];
+
+            db.ref('familia/' + userName + '/trajetos').once('value', snapshot => {
+                snapshot.forEach(child => {
+                    if (child.val().date < dataLimite) {
+                        child.ref.remove();
+                    }
+                });
+            });
+        }
+
+        function toggleHistory() {
+            showHistory = !showHistory;
+            document.getElementById('histBtn').style.background = showHistory ? '#fff' : '#eee';
+            if (!showHistory) {
+                Object.values(historyLines).forEach(line => map.removeLayer(line));
+                historyLines = {};
+            }
+        }
+
         function focusFamily() {
-            const group = new L.featureGroup(Object.values(markers));
-            if (Object.keys(markers).length > 0) {
+            const mArray = Object.values(markers);
+            if (mArray.length > 0) {
+                const group = new L.featureGroup(mArray);
                 map.fitBounds(group.getBounds().pad(0.2));
             }
         }
