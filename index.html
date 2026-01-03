@@ -6,33 +6,32 @@
     <title>Família VIP Tracker</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background: #f0f2f5; }
-        #map { height: 100vh; width: 100vw; z-index: 1; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background: #e0e0e0; }
+        #map { height: 100vh; width: 100vw; z-index: 1; background: #e0e0e0; }
         
-        /* Estética Premium da Bolha */
-        .user-marker { 
-            width: 60px; height: 60px; border-radius: 50%; border: 4px solid white; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4); 
-            background-size: cover; background-position: center; 
-            background-repeat: no-repeat; position: relative;
-            background-color: #555; /* Fundo caso a foto falhe */
+        /* Estética das Bolhas */
+        .marker-container { width: 60px; height: 60px; position: relative; }
+        .user-photo-circle { 
+            width: 60px; height: 60px; border-radius: 50%; 
+            border: 3px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            object-fit: cover; display: block; background: #444;
         }
         .user-label {
             background: rgba(0,0,0,0.85); color: white; padding: 3px 10px;
-            border-radius: 12px; font-size: 12px; white-space: nowrap;
-            position: absolute; bottom: -28px; left: 50%; transform: translateX(-50%);
+            border-radius: 12px; font-size: 11px; white-space: nowrap;
+            position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
             font-weight: bold; border: 1px solid rgba(255,255,255,0.2);
-            text-transform: uppercase; letter-spacing: 0.5px;
         }
 
+        /* Tela de Entrada */
         #auth-screen { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: #fff; z-index: 9999; display: none; 
+            background: white; z-index: 9999; display: none; 
             flex-direction: column; align-items: center; justify-content: center; 
         }
-        .card { width: 85%; max-width: 400px; text-align: center; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .card { width: 85%; max-width: 400px; text-align: center; }
         input, .file-btn { padding: 15px; border-radius: 12px; border: 2px solid #ddd; margin-bottom: 15px; width: 100%; box-sizing: border-box; font-size: 16px; display: block; }
-        button { padding: 18px; background: #000; color: white; border: none; border-radius: 12px; font-weight: bold; width: 100%; cursor: pointer; transition: 0.3s; }
+        button { padding: 18px; background: #000; color: white; border: none; border-radius: 12px; font-weight: bold; width: 100%; cursor: pointer; }
         
         .control-btns { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 12px; }
         .btn-float { background: white; border: none; border-radius: 50%; width: 55px; height: 55px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -42,12 +41,10 @@
 
     <div id="auth-screen">
         <div class="card">
-            <h2 style="margin-bottom: 5px;">Família VIP</h2>
-            <p style="color: #888; margin-bottom: 20px;">Sua localização em tempo real</p>
-            <input type="text" id="userName" placeholder="Qual seu nome?">
-            <label style="font-size: 14px; font-weight: bold; color: #444; display: block; margin-bottom: 8px;">ESCOLHA SUA MELHOR FOTO:</label>
+            <h2>Família VIP</h2>
+            <input type="text" id="userName" placeholder="Seu Nome">
             <input type="file" id="userPhoto" accept="image/*" class="file-btn">
-            <button onclick="processPhotoAndStart()">ACESSAR MAPA</button>
+            <button onclick="saveProfile()">ENTRAR NO MAPA</button>
         </div>
     </div>
 
@@ -77,20 +74,20 @@
         const db = firebase.database();
         let map, userName, userPhoto;
         let markers = {};
-        let historyLines = {}; 
+        let historyLines = {};
         let activeHistoryUser = null;
 
         window.onload = () => {
             userName = localStorage.getItem('family_user');
-            userPhoto = localStorage.getItem('family_photo_vip');
+            userPhoto = localStorage.getItem('vip_p_v2'); // Nova versão para forçar foto nova
             if (userName) initApp();
             else document.getElementById('auth-screen').style.display = 'flex';
         };
 
-        function processPhotoAndStart() {
+        function saveProfile() {
             const name = document.getElementById('userName').value.trim();
             const file = document.getElementById('userPhoto').files[0];
-            if (!name) return alert("Digite seu nome");
+            if (!name) return alert("Nome obrigatório");
 
             if (file) {
                 const reader = new FileReader();
@@ -99,35 +96,32 @@
                     img.src = e.target.result;
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        const size = 150; // Tamanho ideal para estética e performance
-                        canvas.width = size; canvas.height = size;
+                        canvas.width = 150; canvas.height = 150;
                         const ctx = canvas.getContext('2d');
-                        // Corta em círculo perfeito no canvas
-                        ctx.beginPath();
-                        ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
-                        ctx.clip();
-                        ctx.drawImage(img, 0, 0, size, size);
-                        
-                        const processedImg = canvas.toDataURL('image/jpeg', 0.85);
+                        ctx.drawImage(img, 0, 0, 150, 150);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
                         localStorage.setItem('family_user', name);
-                        localStorage.setItem('family_photo_vip', processedImg);
-                        userName = name; userPhoto = processedImg;
-                        document.getElementById('auth-screen').style.display = 'none';
-                        initApp();
+                        localStorage.setItem('vip_p_v2', dataUrl);
+                        location.reload();
                     };
                 };
                 reader.readAsDataURL(file);
             } else {
                 localStorage.setItem('family_user', name);
-                userName = name;
-                document.getElementById('auth-screen').style.display = 'none';
-                initApp();
+                location.reload();
             }
         }
 
         function initApp() {
+            // Mudança para o servidor oficial do OpenStreetMap (mais estável)
             map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0,0], 15);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19
+            }).addTo(map);
+
+            // Forçar o mapa a atualizar o tamanho após carregar
+            setTimeout(() => { map.invalidateSize(); }, 500);
+
             startSync();
             startTracking();
         }
@@ -137,17 +131,17 @@
                 const data = snapshot.val();
                 for (let id in data) {
                     const { lat, lng, photo, trajetos } = data[id];
-                    const finalPhoto = photo || `https://ui-avatars.com/api/?name=${id}&background=random&color=fff&size=128`;
-                    
+                    const imgUrl = photo || `https://ui-avatars.com/api/?name=${id}&background=random&color=fff`;
+
                     if (markers[id]) {
                         markers[id].setLatLng([lat, lng]);
-                        // Atualiza a imagem de fundo diretamente no DOM para garantir estética
-                        const el = markers[id].getElement().querySelector('.user-marker');
-                        if(el) el.style.backgroundImage = `url('${finalPhoto}')`;
+                        const imgEl = markers[id].getElement().querySelector('.user-photo-circle');
+                        if (imgEl) imgEl.src = imgUrl;
                     } else {
                         const icon = L.divIcon({
                             className: 'custom-icon',
-                            html: `<div class="user-marker" style="background-image: url('${finalPhoto}')">
+                            html: `<div class="marker-container">
+                                     <img src="${imgUrl}" class="user-photo-circle">
                                      <div class="user-label">${id}</div>
                                    </div>`,
                             iconSize: [60, 60], iconAnchor: [30, 60]
@@ -158,7 +152,7 @@
                     if (activeHistoryUser === id && trajetos) {
                         const path = Object.values(trajetos).map(p => [p.lat, p.lng]);
                         if (historyLines[id]) map.removeLayer(historyLines[id]);
-                        historyLines[id] = L.polyline(path, { color: '#000', weight: 3, opacity: 0.4, dashArray: '8, 12' }).addTo(map);
+                        historyLines[id] = L.polyline(path, { color: '#000', weight: 4, opacity: 0.5, dashArray: '5, 10' }).addTo(map);
                     }
                 }
             });
@@ -168,21 +162,19 @@
             navigator.geolocation.watchPosition(pos => {
                 const { latitude, longitude } = pos.coords;
                 db.ref('familia/' + userName).update({
-                    lat: latitude, lng: longitude, 
-                    photo: userPhoto || null,
-                    lastUpdate: new Date().getTime()
+                    lat: latitude, lng: longitude, photo: userPhoto, lastUpdate: new Date().getTime()
                 });
                 db.ref('familia/' + userName + '/trajetos').push({
                     lat: latitude, lng: longitude, date: new Date().toISOString().split('T')[0]
                 });
-                if(Object.keys(markers).length === 1) map.setView([latitude, longitude], 16);
+                if(Object.keys(markers).length <= 1) map.panTo([latitude, longitude]);
             }, null, { enableHighAccuracy: true });
         }
 
         function toggleHistory(id) {
             if(activeHistoryUser && historyLines[activeHistoryUser]) map.removeLayer(historyLines[activeHistoryUser]);
-            if(activeHistoryUser === id) { activeHistoryUser = null; } 
-            else { activeHistoryUser = id; alert("Histórico de " + id + " ativado."); }
+            if(activeHistoryUser === id) activeHistoryUser = null;
+            else { activeHistoryUser = id; alert("Histórico de " + id); }
         }
 
         function focusFamily() {
