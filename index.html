@@ -10,14 +10,15 @@
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
         .user-marker { 
-            width: 50px; height: 50px; border-radius: 50%; border: 3px solid white; 
+            width: 55px; height: 55px; border-radius: 50%; border: 3px solid white; 
             box-shadow: 0 4px 10px rgba(0,0,0,0.3); background-size: cover; 
             background-position: center; position: relative; 
         }
         .user-label {
             background: rgba(0,0,0,0.7); color: white; padding: 2px 8px;
             border-radius: 10px; font-size: 11px; white-space: nowrap;
-            position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%);
+            position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%);
+            font-weight: bold;
         }
 
         #auth-screen { 
@@ -26,20 +27,29 @@
             flex-direction: column; align-items: center; justify-content: center; 
         }
         .card { width: 85%; max-width: 400px; text-align: center; }
-        input { padding: 15px; border-radius: 12px; border: 2px solid #eee; margin-bottom: 10px; width: 100%; box-sizing: border-box; }
+        input { padding: 15px; border-radius: 12px; border: 2px solid #eee; margin-bottom: 10px; width: 100%; box-sizing: border-box; font-size: 16px; }
         button { padding: 18px; background: #28a745; color: white; border: none; border-radius: 12px; font-weight: bold; width: 100%; cursor: pointer; }
+        
+        /* Botão para focar na família */
+        .focus-btn {
+            position: fixed; top: 20px; right: 20px; z-index: 1000;
+            background: white; border: none; border-radius: 50%; width: 50px; height: 50px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 24px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
     </style>
 </head>
 <body>
 
     <div id="auth-screen">
         <div class="card">
-            <h2>Entrar na Família</h2>
-            <input type="text" id="userName" placeholder="Seu Nome">
-            <button onclick="startApp()">ENTRAR</button>
+            <h2>Rastreador Familiar</h2>
+            <input type="text" id="userName" placeholder="Seu Nome (Ex: Pai)">
+            <button onclick="startApp()">ENTRAR NO MAPA</button>
         </div>
     </div>
 
+    <button class="focus-btn" onclick="focusFamily()">👥</button>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -60,8 +70,9 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         let map, userName;
-        let markers = {}; // Guarda os marcadores de cada pessoa
-        let pointMarkers = []; // Guarda os pontos marcados (bolhas)
+        let markers = {};
+        let pointMarkers = [];
+        let firstZoom = true;
 
         window.onload = () => {
             userName = localStorage.getItem('family_user');
@@ -79,18 +90,15 @@
         }
 
         function initApp() {
-            map = L.map('map', { zoomControl: false }).setView([0,0], 2);
+            // Inicia o mapa com zoom de rua (15) em vez de zoom do mundo (2)
+            map = L.map('map', { zoomControl: false }).setView([0,0], 15);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
             
-            // ADICIONAR PONTO (BOLHA) PARA TODOS
             map.on('contextmenu', (e) => {
-                const placeName = prompt("Nome deste ponto para a família:");
+                const placeName = prompt("Nome deste lugar para todos verem:");
                 if (placeName) {
                     db.ref('pontos_compartilhados').push({
-                        name: placeName,
-                        lat: e.latlng.lat,
-                        lng: e.latlng.lng,
-                        criadoPor: userName
+                        name: placeName, lat: e.latlng.lat, lng: e.latlng.lng, criadoPor: userName
                     });
                 }
             });
@@ -100,39 +108,32 @@
         }
 
         function startSync() {
-            // Sincroniza localização de todos
             db.ref('familia').on('value', snapshot => {
                 const data = snapshot.val();
                 for (let id in data) {
-                    const { lat, lng, lastUpdate } = data[id];
+                    const { lat, lng } = data[id];
                     if (markers[id]) {
                         markers[id].setLatLng([lat, lng]);
                     } else {
                         const icon = L.divIcon({
                             className: 'custom-div-icon',
-                            html: `<div class="user-marker" style="background-image: url('https://ui-avatars.com/api/?name=${id}&background=random')"><div class="user-label">${id}</div></div>`,
-                            iconSize: [50, 50], iconAnchor: [25, 50]
+                            html: `<div class="user-marker" style="background-image: url('https://ui-avatars.com/api/?name=${id}&background=random&color=fff')"><div class="user-label">${id}</div></div>`,
+                            iconSize: [55, 55], iconAnchor: [27, 55]
                         });
                         markers[id] = L.marker([lat, lng], { icon }).addTo(map);
                     }
                 }
             });
 
-            // Sincroniza pontos marcados (bolhas) para todos
             db.ref('pontos_compartilhados').on('value', snapshot => {
-                // Limpa pontos antigos antes de redesenhar
                 pointMarkers.forEach(m => map.removeLayer(m));
                 pointMarkers = [];
-
                 const data = snapshot.val();
                 for (let id in data) {
                     const p = data[id];
                     const circle = L.circle([p.lat, p.lng], {
-                        color: 'blue',
-                        fillColor: '#30f',
-                        fillOpacity: 0.2,
-                        radius: 100
-                    }).addTo(map).bindPopup(`<b>${p.name}</b><br>Marcado por: ${p.criadoPor}`);
+                        color: '#ff4757', fillColor: '#ff6b81', fillOpacity: 0.3, radius: 100
+                    }).addTo(map).bindPopup(`<b>${p.name}</b><br>Salvo por: ${p.criadoPor}`);
                     pointMarkers.push(circle);
                 }
             });
@@ -142,13 +143,22 @@
             navigator.geolocation.watchPosition(pos => {
                 const { latitude, longitude } = pos.coords;
                 db.ref('familia/' + userName).set({
-                    lat: latitude,
-                    lng: longitude,
-                    lastUpdate: new Date().getTime()
+                    lat: latitude, lng: longitude, lastUpdate: new Date().getTime()
                 });
-                if (markers[userName]) map.panTo([latitude, longitude]);
-                else map.setView([latitude, longitude], 15);
-            }, e => console.error(e), { enableHighAccuracy: true });
+
+                // Só centraliza automaticamente na primeira vez que abre o app
+                if (firstZoom) {
+                    map.setView([latitude, longitude], 16);
+                    firstZoom = false;
+                }
+            }, null, { enableHighAccuracy: true });
+        }
+
+        function focusFamily() {
+            const group = new L.featureGroup(Object.values(markers));
+            if (Object.keys(markers).length > 0) {
+                map.fitBounds(group.getBounds().pad(0.2));
+            }
         }
     </script>
 </body>
