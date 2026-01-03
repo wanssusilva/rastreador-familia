@@ -1,59 +1,6 @@
-// CONFIGURAÇÃO OFICIAL FIREBASE
-const firebaseConfig = {
-    apiKey: "AIzaSyBPwwAWS2aiEqeFJX1ARgRmHzFEj5RCpiw",
-    databaseURL: "https://rastreador-familia-6fe52-default-rtdb.firebaseio.com/",
-    projectId: "rastreador-familia-6fe52",
-};
+// Variável global para armazenar as linhas dos trajetos
+let trilhasAtivas = {};
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-let map, meuNome, marcadores = {};
-const cores = ['#6c5ce7', '#00b894', '#ff7675', '#0984e3', '#f1c40f'];
-
-// 1. Verificar se o usuário já tem nome
-window.onload = () => {
-    meuNome = localStorage.getItem('life_vip_user');
-    if (meuNome) {
-        document.getElementById('login-screen').style.display = 'none';
-        iniciarApp();
-    }
-};
-
-function entrarNoApp() {
-    const nome = document.getElementById('nameInput').value.trim();
-    if (nome) {
-        localStorage.setItem('life_vip_user', nome);
-        location.reload();
-    }
-}
-
-// 2. Inicializar Mapa e GPS
-function iniciarApp() {
-    map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0,0], 2);
-    
-    // Tile Voyager: Carregamento rápido e visual limpo
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
-
-    // Forçar o mapa a carregar as imagens instantaneamente
-    setTimeout(() => { map.invalidateSize(); }, 500);
-
-    syncFirebase();
-    trackGPS();
-}
-
-// 3. Cálculo de Distância (KM)
-function calcularDistancia(trajetos) {
-    if (!trajetos) return "0.0";
-    let distTotal = 0;
-    const pts = Object.values(trajetos);
-    for (let i = 0; i < pts.length - 1; i++) {
-        distTotal += L.latLng(pts[i].lat, pts[i].lng).distanceTo(L.latLng(pts[i+1].lat, pts[i+1].lng));
-    }
-    return (distTotal / 1000).toFixed(1);
-}
-
-// 4. Sincronização em Tempo Real com Firebase
 function syncFirebase() {
     db.ref('familia').on('value', snap => {
         const familia = snap.val();
@@ -66,6 +13,7 @@ function syncFirebase() {
                 marcadores[id].setLatLng([u.lat, u.lng]);
                 document.getElementById(`km-${id}`).innerText = `${km} km hoje`;
             } else {
+                // Criar o marcador com evento de CLIQUE
                 marcadores[id] = L.marker([u.lat, u.lng], {
                     icon: L.divIcon({
                         className: 'custom-icon',
@@ -73,27 +21,38 @@ function syncFirebase() {
                                <div class="user-tag"><b>${id}</b> • <span id="km-${id}">${km} km hoje</span></div>`,
                         iconSize: [50, 50], iconAnchor: [25, 50]
                     })
-                }).addTo(map);
+                }).addTo(map).on('click', () => focarEHistorico(id, u.trajetos, cor, [u.lat, u.lng]));
             }
         }
     });
 }
 
-// 5. Enviar Localização para o Firebase
-function trackGPS() {
-    navigator.geolocation.watchPosition(pos => {
-        const { latitude, longitude } = pos.coords;
-        const ref = db.ref('familia/' + meuNome);
+// Função que puxa a localização e o histórico ao clicar
+function focarEHistorico(nome, trajetos, cor, posicaoAtual) {
+    // 1. Puxa a localização atual (Centraliza o mapa nele)
+    map.flyTo(posicaoAtual, 16, { animate: true, duration: 1.5 });
+
+    // 2. Gerencia o Histórico (Trilha)
+    if (trilhasAtivas[nome]) {
+        // Se já estiver mostrando a trilha, remove ao clicar de novo (Toggle)
+        map.removeLayer(trilhasAtivas[nome]);
+        delete trilhasAtivas[nome];
+    } else {
+        // Se não houver trilha, desenha ela no mapa
+        if (!trajetos) return;
+
+        const pontos = Object.values(trajetos).map(p => [p.lat, p.lng]);
         
-        ref.update({ lat: latitude, lng: longitude, t: Date.now() });
-        ref.child('trajetos').push({ lat: latitude, lng: longitude, t: Date.now() });
+        // Desenha uma linha suave mostrando por onde ele passou
+        trilhasAtivas[nome] = L.polyline(pontos, {
+            color: cor,
+            weight: 5,
+            opacity: 0.6,
+            dashArray: '10, 10', // Linha tracejada para ficar moderno
+            lineJoin: 'round'
+        }).addTo(map);
 
-        // Ajusta o mapa na primeira vez
-        if (map.getZoom() < 10) map.setView([latitude, longitude], 15);
-    }, null, { enableHighAccuracy: true });
-}
-
-function focarFamilia() {
-    const grupo = new L.featureGroup(Object.values(marcadores));
-    if (grupo.getLayers().length > 0) map.fitBounds(grupo.getBounds().pad(0.3));
+        // Ajusta o zoom para mostrar o trajeto inteiro
+        map.fitBounds(trilhasAtivas[nome].getBounds(), { padding: [50, 50] });
+    }
 }
