@@ -6,51 +6,48 @@
     <title>Família VIP Tracker</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background: #e0e0e0; }
-        #map { height: 100vh; width: 100vw; z-index: 1; background: #e0e0e0; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        #map { height: 100vh; width: 100vw; }
         
-        /* Estética das Bolhas */
-        .marker-container { width: 60px; height: 60px; position: relative; }
-        .user-photo-circle { 
-            width: 60px; height: 60px; border-radius: 50%; 
-            border: 3px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-            object-fit: cover; display: block; background: #444;
+        /* Bolha padrão colorida que funcionava */
+        .user-marker { 
+            width: 50px; height: 50px; border-radius: 50%; border: 3px solid white; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: flex;
+            align-items: center; justify-content: center;
+            font-weight: bold; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            background-color: #ff5722; /* Cor de fundo padrão */
         }
         .user-label {
-            background: rgba(0,0,0,0.85); color: white; padding: 3px 10px;
-            border-radius: 12px; font-size: 11px; white-space: nowrap;
-            position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
-            font-weight: bold; border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.7); color: white; padding: 2px 8px;
+            border-radius: 10px; font-size: 11px; white-space: nowrap;
+            position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%);
         }
 
-        /* Tela de Entrada */
         #auth-screen { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: white; z-index: 9999; display: none; 
             flex-direction: column; align-items: center; justify-content: center; 
         }
-        .card { width: 85%; max-width: 400px; text-align: center; }
-        input, .file-btn { padding: 15px; border-radius: 12px; border: 2px solid #ddd; margin-bottom: 15px; width: 100%; box-sizing: border-box; font-size: 16px; display: block; }
-        button { padding: 18px; background: #000; color: white; border: none; border-radius: 12px; font-weight: bold; width: 100%; cursor: pointer; }
+        .card { width: 80%; max-width: 400px; text-align: center; }
+        input { padding: 15px; border-radius: 10px; border: 1px solid #ccc; margin-bottom: 10px; width: 100%; box-sizing: border-box; }
+        button { padding: 15px; background: #28a745; color: white; border: none; border-radius: 10px; width: 100%; font-weight: bold; }
         
-        .control-btns { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 12px; }
-        .btn-float { background: white; border: none; border-radius: 50%; width: 55px; height: 55px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .control-btns { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
+        .btn-float { background: white; border: none; border-radius: 50%; width: 50px; height: 50px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-size: 20px; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div id="auth-screen">
         <div class="card">
-            <h2>Família VIP</h2>
+            <h2>Rastreador Familiar</h2>
             <input type="text" id="userName" placeholder="Seu Nome">
-            <input type="file" id="userPhoto" accept="image/*" class="file-btn">
-            <button onclick="saveProfile()">ENTRAR NO MAPA</button>
+            <button onclick="entrar()">ENTRAR</button>
         </div>
     </div>
 
     <div class="control-btns">
         <button class="btn-float" onclick="focusFamily()">👥</button>
-        <button class="btn-float" onclick="location.reload()">🔄</button>
     </div>
     
     <div id="map"></div>
@@ -72,56 +69,30 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        let map, userName, userPhoto;
+        let map, userName;
         let markers = {};
         let historyLines = {};
         let activeHistoryUser = null;
 
         window.onload = () => {
             userName = localStorage.getItem('family_user');
-            userPhoto = localStorage.getItem('vip_p_v2'); // Nova versão para forçar foto nova
             if (userName) initApp();
             else document.getElementById('auth-screen').style.display = 'flex';
         };
 
-        function saveProfile() {
+        function entrar() {
             const name = document.getElementById('userName').value.trim();
-            const file = document.getElementById('userPhoto').files[0];
-            if (!name) return alert("Nome obrigatório");
-
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.src = e.target.result;
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = 150; canvas.height = 150;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, 150, 150);
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                        localStorage.setItem('family_user', name);
-                        localStorage.setItem('vip_p_v2', dataUrl);
-                        location.reload();
-                    };
-                };
-                reader.readAsDataURL(file);
-            } else {
+            if (name) {
                 localStorage.setItem('family_user', name);
                 location.reload();
             }
         }
 
         function initApp() {
-            // Mudança para o servidor oficial do OpenStreetMap (mais estável)
-            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0,0], 15);
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19
-            }).addTo(map);
-
-            // Forçar o mapa a atualizar o tamanho após carregar
-            setTimeout(() => { map.invalidateSize(); }, 500);
-
+            // Voltando ao mapa que carregava rápido e sem erros
+            map = L.map('map', { zoomControl: false }).setView([0,0], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            
             startSync();
             startTracking();
         }
@@ -130,29 +101,28 @@
             db.ref('familia').on('value', snapshot => {
                 const data = snapshot.val();
                 for (let id in data) {
-                    const { lat, lng, photo, trajetos } = data[id];
-                    const imgUrl = photo || `https://ui-avatars.com/api/?name=${id}&background=random&color=fff`;
+                    const { lat, lng, trajetos } = data[id];
+                    const iniciais = id.substring(0, 2).toUpperCase();
 
                     if (markers[id]) {
                         markers[id].setLatLng([lat, lng]);
-                        const imgEl = markers[id].getElement().querySelector('.user-photo-circle');
-                        if (imgEl) imgEl.src = imgUrl;
                     } else {
                         const icon = L.divIcon({
                             className: 'custom-icon',
-                            html: `<div class="marker-container">
-                                     <img src="${imgUrl}" class="user-photo-circle">
+                            html: `<div class="user-marker">
+                                     ${iniciais}
                                      <div class="user-label">${id}</div>
                                    </div>`,
-                            iconSize: [60, 60], iconAnchor: [30, 60]
+                            iconSize: [50, 50], iconAnchor: [25, 50]
                         });
                         markers[id] = L.marker([lat, lng], { icon }).addTo(map).on('click', () => toggleHistory(id));
                     }
 
+                    // Lógica do histórico simplificada (só aparece se clicar no usuário)
                     if (activeHistoryUser === id && trajetos) {
                         const path = Object.values(trajetos).map(p => [p.lat, p.lng]);
                         if (historyLines[id]) map.removeLayer(historyLines[id]);
-                        historyLines[id] = L.polyline(path, { color: '#000', weight: 4, opacity: 0.5, dashArray: '5, 10' }).addTo(map);
+                        historyLines[id] = L.polyline(path, { color: 'blue', weight: 3, opacity: 0.5 }).addTo(map);
                     }
                 }
             });
@@ -162,10 +132,11 @@
             navigator.geolocation.watchPosition(pos => {
                 const { latitude, longitude } = pos.coords;
                 db.ref('familia/' + userName).update({
-                    lat: latitude, lng: longitude, photo: userPhoto, lastUpdate: new Date().getTime()
+                    lat: latitude, lng: longitude, lastUpdate: new Date().getTime()
                 });
+                // Grava o rastro para o histórico de 2 dias
                 db.ref('familia/' + userName + '/trajetos').push({
-                    lat: latitude, lng: longitude, date: new Date().toISOString().split('T')[0]
+                    lat: latitude, lng: longitude, time: new Date().getTime()
                 });
                 if(Object.keys(markers).length <= 1) map.panTo([latitude, longitude]);
             }, null, { enableHighAccuracy: true });
@@ -173,8 +144,12 @@
 
         function toggleHistory(id) {
             if(activeHistoryUser && historyLines[activeHistoryUser]) map.removeLayer(historyLines[activeHistoryUser]);
-            if(activeHistoryUser === id) activeHistoryUser = null;
-            else { activeHistoryUser = id; alert("Histórico de " + id); }
+            if(activeHistoryUser === id) {
+                activeHistoryUser = null;
+            } else {
+                activeHistoryUser = id;
+                alert("Mostrando rastro de " + id);
+            }
         }
 
         function focusFamily() {
