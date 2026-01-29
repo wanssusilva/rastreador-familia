@@ -3,151 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulado Oficial ENEM</title>
+    <title>ENEM Simulado - Premium</title>
     <style>
-        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .header { display: flex; justify-content: space-between; border-bottom: 2px solid var(--bg); padding-bottom: 10px; margin-bottom: 20px; }
-        .area-tag { background: var(--primary); color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.8em; }
-        .question-text { font-size: 1.2em; line-height: 1.6; margin-bottom: 25px; }
-        .option { display: block; padding: 15px; border: 2px solid var(--bg); border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: 0.3s; }
-        .option:hover { border-color: var(--accent); background: #ebf5fb; }
-        .option.selected { border-color: var(--accent); background: #d6eaf8; font-weight: bold; }
-        .nav-btns { display: flex; justify-content: space-between; margin-top: 30px; }
-        button { padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        .btn-next { background: var(--accent); color: white; }
-        .btn-prev { background: #bdc3c7; }
+        :root { --pink: #FF69B4; --pink-soft: #FFF0F5; --text: #4a4a4a; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #fdf2f7; color: var(--text); margin: 0; padding: 20px; }
+        .app-container { max-width: 700px; margin: auto; background: white; border-radius: 25px; padding: 30px; box-shadow: 0 10px 25px rgba(255,105,180,0.15); }
+        .header { text-align: center; border-bottom: 2px solid var(--pink-soft); margin-bottom: 25px; padding-bottom: 10px; }
+        .area-badge { background: var(--pink); color: white; padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; }
+        .q-text { font-size: 1.15rem; line-height: 1.6; margin: 20px 0; }
+        .opt { display: flex; align-items: center; padding: 15px; border: 2px solid var(--pink-soft); border-radius: 15px; margin-bottom: 12px; cursor: pointer; transition: 0.2s; }
+        .opt:hover { background: var(--pink-soft); border-color: var(--pink); }
+        .opt.selected { background: var(--pink); color: white; border-color: var(--pink); }
+        .footer { display: flex; justify-content: space-between; margin-top: 30px; }
+        button { background: var(--pink); color: white; border: none; padding: 12px 30px; border-radius: 50px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255,105,180,0.3); }
         .hidden { display: none; }
-        textarea { width: 100%; height: 300px; padding: 15px; border: 2px solid var(--bg); border-radius: 8px; font-family: 'Times New Roman', serif; font-size: 1.1em; resize: none; }
-        .result-card { text-align: center; }
-        .score { font-size: 3em; color: var(--accent); font-weight: bold; }
+        textarea { width: 100%; height: 350px; border: 2px solid var(--pink-soft); border-radius: 15px; padding: 15px; font-size: 1rem; resize: none; outline: none; }
     </style>
 </head>
 <body>
 
-<div class="container" id="quiz-container">
-    <div id="intro">
-        <h1>Simulado Estilo ENEM</h1>
-        <p>Prepare-se com 20 questões aleatórias e prova de redação.</p>
-        <button class="btn-next" onclick="startApp()">Iniciar Prova</button>
+<div class="app-container">
+    <div id="start-screen">
+        <div class="header">
+            <h1 style="color: var(--pink);">Simulado da Tainara 🌸</h1>
+            <p>Clique abaixo para carregar suas 20 questões exclusivas.</p>
+        </div>
+        <button onclick="fetchSimulado()" style="width: 100%;">Iniciar Prova Agora</button>
     </div>
 
     <div id="quiz-screen" class="hidden">
         <div class="header">
-            <span id="q-number">Questão 1/20</span>
-            <span id="q-area" class="area-tag">Matemática</span>
+            <span id="q-counter" style="color: var(--pink); font-weight: bold;">1/20</span><br><br>
+            <span id="q-area" class="area-badge">Área</span>
         </div>
-        <div id="q-text" class="question-text"></div>
-        <div id="options-container"></div>
-        <div class="nav-btns">
-            <button class="btn-prev" onclick="changeQuestion(-1)">Anterior</button>
-            <button class="btn-next" id="next-btn" onclick="changeQuestion(1)">Próxima</button>
-        </div>
-    </div>
-
-    <div id="essay-screen" class="hidden">
-        <h2>Redação</h2>
-        <p><strong>Tema:</strong> Os impactos da inteligência artificial na soberania nacional e no mercado de trabalho brasileiro.</p>
-        <p><small>Textos motivadores: [Avanços tecnológicos vs Empregabilidade tradicional]</small></p>
-        <textarea id="essay-text" placeholder="Mínimo 7 linhas, máximo 30..."></textarea>
-        <div class="nav-btns">
-            <button class="btn-prev" onclick="backToQuiz()">Revisar Questões</button>
-            <button class="btn-next" style="background:var(--success)" onclick="finishAll()">Concluir Simulado</button>
+        <div id="q-body" class="q-text"></div>
+        <div id="options-list"></div>
+        <div class="footer">
+            <button onclick="nav(-1)" style="background: #ccc;">Anterior</button>
+            <button id="next-btn" onclick="nav(1)">Próxima</button>
         </div>
     </div>
 
-    <div id="result-screen" class="hidden" class="result-card">
-        <h2>Resultado Final</h2>
-        <p>Objetivas:</p>
-        <div class="score" id="obj-score"></div>
-        <p>Redação:</p>
-        <div class="score" id="essay-score" style="color:var(--success)"></div>
-        <div id="review-details" style="text-align: left; margin-top: 20px;"></div>
-        <button class="btn-next" onclick="location.reload()" style="margin-top:20px;">Refazer Novo Simulado</button>
+    <div id="red-screen" class="hidden">
+        <h2 style="color: var(--pink);">Prova de Redação</h2>
+        <p><strong>Tema:</strong> A persistência da violência contra a mulher na sociedade brasileira contemporânea.</p>
+        <textarea id="essay-box" placeholder="Escreva seu texto aqui..."></textarea>
+        <button onclick="finishAll()" style="width: 100%; margin-top: 20px;">Finalizar Tudo e Corrigir</button>
+    </div>
+
+    <div id="res-screen" class="hidden" style="text-align: center;">
+        <h1 style="color: var(--pink);">Resultado do Simulado</h1>
+        <div style="font-size: 4rem; font-weight: bold; color: var(--pink);" id="score-obj">0</div>
+        <p>Nota da Redação:</p>
+        <div style="font-size: 2rem; color: #27ae60;" id="score-red">0</div>
+        <button onclick="location.reload()" style="margin-top: 30px;">Novo Simulado</button>
     </div>
 </div>
 
 <script>
     let questions = [];
-    let currentIdx = 0;
+    let current = 0;
     let userAnswers = {};
 
-    async function startApp() {
-        const response = await fetch('http://localhost:3000/api/simulado');
-        questions = await response.json();
-        document.getElementById('intro').classList.add('hidden');
-        document.getElementById('quiz-screen').classList.remove('hidden');
-        renderQuestion();
-    }
-
-    function renderQuestion() {
-        const q = questions[currentIdx];
-        document.getElementById('q-number').innerText = `Questão ${currentIdx + 1}/20`;
-        document.getElementById('q-area').innerText = q.area;
-        document.getElementById('q-text').innerText = q.enunciado;
-        
-        const container = document.getElementById('options-container');
-        container.innerHTML = '';
-        
-        Object.entries(q.alternativas).forEach(([key, value]) => {
-            const div = document.createElement('div');
-            div.className = `option ${userAnswers[currentIdx] === key ? 'selected' : ''}`;
-            div.innerHTML = `<strong>${key})</strong> ${value}`;
-            div.onclick = () => selectOption(key);
-            container.appendChild(div);
-        });
-
-        document.getElementById('next-btn').innerText = currentIdx === 19 ? "Ir para Redação" : "Próxima";
-    }
-
-    function selectOption(key) {
-        userAnswers[currentIdx] = key;
-        renderQuestion();
-    }
-
-    function changeQuestion(dir) {
-        if (dir === 1 && currentIdx === 19) {
-            document.getElementById('quiz-screen').classList.add('hidden');
-            document.getElementById('essay-screen').classList.remove('hidden');
-        } else if (currentIdx + dir >= 0 && currentIdx + dir < 20) {
-            currentIdx += dir;
-            renderQuestion();
+    async function fetchSimulado() {
+        try {
+            const res = await fetch('http://localhost:3000/api/simulado');
+            questions = await res.json();
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.remove('hidden');
+            render();
+        } catch (e) {
+            alert("Erro ao conectar com o Back-end! Certifique-se que o server.js está rodando.");
         }
     }
 
-    function backToQuiz() {
-        document.getElementById('essay-screen').classList.add('hidden');
-        document.getElementById('quiz-screen').classList.remove('hidden');
+    function render() {
+        const q = questions[current];
+        document.getElementById('q-counter').innerText = `Questão ${current + 1}/20`;
+        document.getElementById('q-area').innerText = q.area;
+        document.getElementById('q-body').innerText = q.enunciado;
+        
+        const list = document.getElementById('options-list');
+        list.innerHTML = '';
+        
+        Object.entries(q.alternativas).forEach(([key, txt]) => {
+            const div = document.createElement('div');
+            div.className = `opt ${userAnswers[current] === key ? 'selected' : ''}`;
+            div.innerHTML = `<strong>${key})</strong> &nbsp; ${txt}`;
+            div.onclick = () => { userAnswers[current] = key; render(); };
+            list.appendChild(div);
+        });
+
+        document.getElementById('next-btn').innerText = current === 19 ? "Ir para Redação" : "Próxima";
+    }
+
+    function nav(dir) {
+        if (dir === 1 && current === 19) {
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('red-screen').classList.remove('hidden');
+        } else if (current + dir >= 0 && current + dir < 20) {
+            current += dir;
+            render();
+        }
     }
 
     function finishAll() {
-        // Correção Objetivas
-        let score = 0;
-        let review = "";
-        questions.forEach((q, i) => {
-            const isCorrect = userAnswers[i] === q.correta;
-            if (isCorrect) score += 10;
-            review += `<p>${i+1}. ${isCorrect ? '✅' : '❌'} (Sua: ${userAnswers[i] || '-'} | Correta: ${q.correta})</p>`;
-        });
-
-        // Avaliação Redação (Critérios Fixos)
-        const text = document.getElementById('essay-text').value;
-        const lines = text.split('\n').filter(l => l.length > 20).length;
-        let essayScore = 0;
+        let hits = 0;
+        questions.forEach((q, i) => { if(userAnswers[i] === q.correta) hits += 10; });
         
-        if (lines >= 7 && lines <= 30) {
-            essayScore += text.includes("IA") ? 200 : 50; // Adequação
-            essayScore += text.length > 500 ? 300 : 100; // Argumentação
-            essayScore += (text.match(/,/g) || []).length > 5 ? 250 : 100; // Coesão
-            essayScore += text.length > 800 ? 250 : 100; // Gramática
-        }
+        const essay = document.getElementById('essay-box').value;
+        let redScore = essay.length > 500 ? 1000 : essay.length * 2;
 
-        document.getElementById('essay-screen').classList.add('hidden');
-        document.getElementById('result-screen').classList.remove('hidden');
-        document.getElementById('obj-score').innerText = `${score}/200`;
-        document.getElementById('essay-score').innerText = `${essayScore}/1000`;
-        document.getElementById('review-details').innerHTML = review;
+        document.getElementById('red-screen').classList.add('hidden');
+        document.getElementById('res-screen').classList.remove('hidden');
+        document.getElementById('score-obj').innerText = `${hits}/200`;
+        document.getElementById('score-red').innerText = `${Math.min(1000, redScore)}/1000`;
     }
 </script>
 </body>
