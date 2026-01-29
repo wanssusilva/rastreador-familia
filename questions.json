@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "area": "Matemática",
+    "enunciado": "Um reservatório em formato de paralelepípedo possui dimensões de 2m, 3m e 4m. Se o nível da água ocupa 75% da sua capacidade total, qual o volume de água presente?",
+    "alternativas": {
+      "A": "12 m³", "B": "15 m³", "C": "18 m³", "D": "20 m³", "E": "24 m³"
+    },
+    "correta": "C"
+  },
+  {
+    "id": 2,
+    "area": "Ciências Humanas",
+    "enunciado": "A política de 'Pão e Circo', aplicada no Império Romano, visava conter as massas urbanas através de:",
+    "alternativas": {
+      "A": "Distribuição de terras e educação.", "B": "Entretenimento e distribuição de alimentos.", "C": "Serviço militar obrigatório e impostos.", "D": "Cidadania plena e direitos políticos.", "E": "Isenção fiscal para plebeus."
+    },
+    "correta": "B"
+  }
+]
