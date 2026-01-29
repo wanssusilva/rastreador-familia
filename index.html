@@ -3,123 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENEM Simulado - Premium</title>
+    <title>Simulado Anderson</title>
     <style>
-        :root { --pink: #FF69B4; --pink-soft: #FFF0F5; --text: #4a4a4a; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #fdf2f7; color: var(--text); margin: 0; padding: 20px; }
-        .app-container { max-width: 700px; margin: auto; background: white; border-radius: 25px; padding: 30px; box-shadow: 0 10px 25px rgba(255,105,180,0.15); }
-        .header { text-align: center; border-bottom: 2px solid var(--pink-soft); margin-bottom: 25px; padding-bottom: 10px; }
-        .area-badge { background: var(--pink); color: white; padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; }
-        .q-text { font-size: 1.15rem; line-height: 1.6; margin: 20px 0; }
-        .opt { display: flex; align-items: center; padding: 15px; border: 2px solid var(--pink-soft); border-radius: 15px; margin-bottom: 12px; cursor: pointer; transition: 0.2s; }
-        .opt:hover { background: var(--pink-soft); border-color: var(--pink); }
-        .opt.selected { background: var(--pink); color: white; border-color: var(--pink); }
-        .footer { display: flex; justify-content: space-between; margin-top: 30px; }
-        button { background: var(--pink); color: white; border: none; padding: 12px 30px; border-radius: 50px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255,105,180,0.3); }
-        .hidden { display: none; }
-        textarea { width: 100%; height: 350px; border: 2px solid var(--pink-soft); border-radius: 15px; padding: 15px; font-size: 1rem; resize: none; outline: none; }
+        body { font-family: sans-serif; background: #FFF0F5; padding: 15px; }
+        .box { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .area { background: #FF69B4; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; }
+        .item { display: block; padding: 12px; border: 2px solid #eee; border-radius: 10px; margin: 10px 0; cursor: pointer; }
+        .sel { background: #FF69B4; color: white; border-color: #FF69B4; }
+        .btn { background: #FF69B4; color: white; border: none; padding: 15px; border-radius: 10px; width: 100%; font-weight: bold; }
     </style>
 </head>
 <body>
-
-<div class="app-container">
-    <div id="start-screen">
-        <div class="header">
-            <h1 style="color: var(--pink);">Simulado da Tainara 🌸</h1>
-            <p>Clique abaixo para carregar suas 20 questões exclusivas.</p>
+    <div class="box" id="app">
+        <div style="display:flex; justify-content:space-between">
+            <span id="num">1/20</span>
+            <span id="cat" class="area">Matéria</span>
         </div>
-        <button onclick="fetchSimulado()" style="width: 100%;">Iniciar Prova Agora</button>
+        <p id="txt" style="font-size: 18px; margin: 20px 0;"></p>
+        <div id="opts"></div>
+        <button class="btn" onclick="pular()">PRÓXIMA</button>
     </div>
 
-    <div id="quiz-screen" class="hidden">
-        <div class="header">
-            <span id="q-counter" style="color: var(--pink); font-weight: bold;">1/20</span><br><br>
-            <span id="q-area" class="area-badge">Área</span>
-        </div>
-        <div id="q-body" class="q-text"></div>
-        <div id="options-list"></div>
-        <div class="footer">
-            <button onclick="nav(-1)" style="background: #ccc;">Anterior</button>
-            <button id="next-btn" onclick="nav(1)">Próxima</button>
-        </div>
-    </div>
+    <script>
+        let banco = [];
+        let pos = 0;
+        let nota = 0;
+        let esc = "";
 
-    <div id="red-screen" class="hidden">
-        <h2 style="color: var(--pink);">Prova de Redação</h2>
-        <p><strong>Tema:</strong> A persistência da violência contra a mulher na sociedade brasileira contemporânea.</p>
-        <textarea id="essay-box" placeholder="Escreva seu texto aqui..."></textarea>
-        <button onclick="finishAll()" style="width: 100%; margin-top: 20px;">Finalizar Tudo e Corrigir</button>
-    </div>
-
-    <div id="res-screen" class="hidden" style="text-align: center;">
-        <h1 style="color: var(--pink);">Resultado do Simulado</h1>
-        <div style="font-size: 4rem; font-weight: bold; color: var(--pink);" id="score-obj">0</div>
-        <p>Nota da Redação:</p>
-        <div style="font-size: 2rem; color: #27ae60;" id="score-red">0</div>
-        <button onclick="location.reload()" style="margin-top: 30px;">Novo Simulado</button>
-    </div>
-</div>
-
-<script>
-    let questions = [];
-    let current = 0;
-    let userAnswers = {};
-
-    async function fetchSimulado() {
-        try {
-            const res = await fetch('http://localhost:3000/api/simulado');
-            questions = await res.json();
-            document.getElementById('start-screen').classList.add('hidden');
-            document.getElementById('quiz-screen').classList.remove('hidden');
-            render();
-        } catch (e) {
-            alert("Erro ao conectar com o Back-end! Certifique-se que o server.js está rodando.");
+        async function carregar() {
+            const r = await fetch('http://localhost:3000/api/simulado');
+            banco = await r.json();
+            ver();
         }
-    }
 
-    function render() {
-        const q = questions[current];
-        document.getElementById('q-counter').innerText = `Questão ${current + 1}/20`;
-        document.getElementById('q-area').innerText = q.area;
-        document.getElementById('q-body').innerText = q.enunciado;
-        
-        const list = document.getElementById('options-list');
-        list.innerHTML = '';
-        
-        Object.entries(q.alternativas).forEach(([key, txt]) => {
-            const div = document.createElement('div');
-            div.className = `opt ${userAnswers[current] === key ? 'selected' : ''}`;
-            div.innerHTML = `<strong>${key})</strong> &nbsp; ${txt}`;
-            div.onclick = () => { userAnswers[current] = key; render(); };
-            list.appendChild(div);
-        });
-
-        document.getElementById('next-btn').innerText = current === 19 ? "Ir para Redação" : "Próxima";
-    }
-
-    function nav(dir) {
-        if (dir === 1 && current === 19) {
-            document.getElementById('quiz-screen').classList.add('hidden');
-            document.getElementById('red-screen').classList.remove('hidden');
-        } else if (current + dir >= 0 && current + dir < 20) {
-            current += dir;
-            render();
+        function ver() {
+            const q = banco[pos];
+            esc = "";
+            document.getElementById('num').innerText = (pos + 1) + "/20";
+            document.getElementById('cat').innerText = q.area;
+            document.getElementById('txt').innerText = q.enunciado;
+            const d = document.getElementById('opts');
+            d.innerHTML = "";
+            for (let l in q.alternativas) {
+                const b = document.createElement('div');
+                b.className = "item";
+                b.innerHTML = "<strong>"+l+")</strong> " + q.alternativas[l];
+                b.onclick = () => {
+                    document.querySelectorAll('.item').forEach(i => i.classList.remove('sel'));
+                    b.classList.add('sel');
+                    esc = l;
+                };
+                d.appendChild(b);
+            }
         }
-    }
 
-    function finishAll() {
-        let hits = 0;
-        questions.forEach((q, i) => { if(userAnswers[i] === q.correta) hits += 10; });
-        
-        const essay = document.getElementById('essay-box').value;
-        let redScore = essay.length > 500 ? 1000 : essay.length * 2;
-
-        document.getElementById('red-screen').classList.add('hidden');
-        document.getElementById('res-screen').classList.remove('hidden');
-        document.getElementById('score-obj').innerText = `${hits}/200`;
-        document.getElementById('score-red').innerText = `${Math.min(1000, redScore)}/1000`;
-    }
-</script>
+        function pular() {
+            if(!esc) return alert("Selecione!");
+            if(esc === banco[pos].correta) nota += 10;
+            if(pos < 19) { pos++; ver(); }
+            else { alert("Fim! Nota: " + nota); location.reload(); }
+        }
+        carregar();
+    </script>
 </body>
 </html>
